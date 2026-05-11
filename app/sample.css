@@ -1,82 +1,32 @@
 @import "tailwindcss";
-@import "tw-animate-css";
-@import "shadcn/tailwind.css";
-
-@custom-variant dark (&:is(.dark *));
 
 /* ─── Satoshi ──────────────────────────────────────────────────────────────── */
-@font-face {
-  font-family: "Satoshi";
-  src: url("./assets/satoshi/Satoshi-Light.otf") format("opentype");
-  font-weight: 300;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Satoshi";
-  src: url("./assets/satoshi/Satoshi-LightItalic.otf") format("opentype");
-  font-weight: 300;
-  font-style: italic;
-  font-display: swap;
-}
 @font-face {
   font-family: "Satoshi";
   src: url("./assets/satoshi/Satoshi-Regular.otf") format("opentype");
   font-weight: 400;
   font-style: normal;
-  font-display: swap;
 }
 @font-face {
   font-family: "Satoshi";
   src: url("./assets/satoshi/Satoshi-Italic.otf") format("opentype");
   font-weight: 400;
   font-style: italic;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Satoshi";
-  src: url("./assets/satoshi/Satoshi-Medium.otf") format("opentype");
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Satoshi";
-  src: url("./assets/satoshi/Satoshi-MediumItalic.otf") format("opentype");
-  font-weight: 500;
-  font-style: italic;
-  font-display: swap;
 }
 @font-face {
   font-family: "Satoshi";
   src: url("./assets/satoshi/Satoshi-Bold.otf") format("opentype");
   font-weight: 700;
   font-style: normal;
-  font-display: swap;
 }
 @font-face {
   font-family: "Satoshi";
   src: url("./assets/satoshi/Satoshi-BoldItalic.otf") format("opentype");
   font-weight: 700;
   font-style: italic;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Satoshi";
-  src: url("./assets/satoshi/Satoshi-Black.otf") format("opentype");
-  font-weight: 900;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Satoshi";
-  src: url("./assets/satoshi/Satoshi-BlackItalic.otf") format("opentype");
-  font-weight: 900;
-  font-style: italic;
-  font-display: swap;
 }
 
-/* ─── Panda Design Tokens ──────────────────────────────────────────────────── */
+/* ─── Design Tokens ────────────────────────────────────────────────────────── */
 @theme {
   /* Fonts */
   --font-heading: "Satoshi", sans-serif;
@@ -117,11 +67,15 @@
   --color-neutral-1000: #0a0a0a;
   --color-neutral-1100: #080808;
 
-  /* ── Colors: Semantic surfaces (values set in :root / .dark) */
+  /* ── Colors: Semantic surfaces (values set in :root / html.dark) */
+  --color-background:     initial;
   --color-surface:        initial;
   --color-surface-raised: initial;
+  --color-border:         initial;
   --color-border-subtle:  initial;
-  --color-card-soft:      initial;
+
+  /* Warm off-white (light) / very dark grey (dark) — e.g. MicroStory proof cards */
+  --color-card-soft: initial;
 
   /* ── Colors: Semantic text */
   --color-text-primary:   initial;
@@ -133,7 +87,7 @@
   --color-overlay:  initial;
   --color-nav-bg:   initial;
 
-  /* ── Shadows: Primary glow (values set in :root / .dark) */
+  /* ── Shadows: Primary glow (values set in :root / html.dark) */
   --shadow-primary-glow-sm: initial;
   --shadow-primary-glow-md: initial;
 
@@ -230,9 +184,11 @@
   --layout-space-5xl: 72px;
   --layout-space-6xl: 80px;
 
-  /* ── Border radius (Panda scale — kept; shadcn @theme inline below
-   *   defines its own --radius-sm/md/lg/xl/2xl/3xl/4xl which take precedence
-   *   inside shadcn primitives via calc() of --radius) */
+  /* ── Border radius */
+  --radius-sm:   4px;
+  --radius-md:   8px;
+  --radius-lg:   16px;
+  --radius-xl:   24px;
   --radius-pill: 999px;
 
   /* ── Shadows (elevation) */
@@ -247,109 +203,45 @@
 
 /* ─── Theme: Light mode (default) ──────────────────────────────────────────── */
 :root {
-  /* Panda semantic tokens */
+  --color-background:       #ffffff;
   --color-surface:          #f5f5f5;
   --color-surface-raised:   #ebebeb;
+  --color-border:           #d4d4d6;
   --color-border-subtle:    #e8e8ea;
-  --color-card-soft:        #fcefea;
   --color-text-primary:     #0a0a0a;
   --color-text-secondary:   #3d3d3f;
   --color-text-muted:       #737375;
   --color-text-inverse:     #ffffff;
   --color-overlay:          rgba(255, 255, 255, 0.5);
   --color-nav-bg:           #ffffff;
+  --color-card-soft:        #fcefea;
   --shadow-primary-glow-sm: 0 0 16px 0 rgba(204, 53, 0, 0.20);
   --shadow-primary-glow-md: 0 0 24px 0 rgba(204, 53, 0, 0.25);
+  /* Soft separation instead of solid section borders */
   --shadow-section-separate: 0 16px 44px -24px rgba(10, 10, 10, 0.09);
   --shadow-marquee-edge: 0 -14px 36px -22px rgba(10, 10, 10, 0.075), 0 14px 36px -22px rgba(10, 10, 10, 0.075);
   --shadow-footer-rule: inset 0 1px 0 rgba(10, 10, 10, 0.065);
-
-  /* Shadcn surface tokens — mapped to Panda values */
-  --background:           #ffffff;
-  --foreground:           #0a0a0a;
-  --card:                 #ffffff;
-  --card-foreground:      #0a0a0a;
-  --popover:              #ffffff;
-  --popover-foreground:   #0a0a0a;
-  --primary:              #cc3500;
-  --primary-foreground:   #ffffff;
-  --secondary:            #f5f5f5;
-  --secondary-foreground: #0a0a0a;
-  --muted:                #f5f5f5;
-  --muted-foreground:     #737375;
-  --accent:               #fcefea;
-  --accent-foreground:    #0a0a0a;
-  --destructive:          #a73125;
-  --border:               #d4d4d6;
-  --input:                #d4d4d6;
-  --ring:                 #cc3500;
-  --chart-1:              #cc3500;
-  --chart-2:              #27a589;
-  --chart-3:              #1f72ad;
-  --chart-4:              #f7b30b;
-  --chart-5:              #a73125;
-  --radius:               0.625rem;
-  --sidebar:                       #ffffff;
-  --sidebar-foreground:            #0a0a0a;
-  --sidebar-primary:               #cc3500;
-  --sidebar-primary-foreground:    #ffffff;
-  --sidebar-accent:                #f5f5f5;
-  --sidebar-accent-foreground:     #0a0a0a;
-  --sidebar-border:                #e8e8ea;
-  --sidebar-ring:                  #cc3500;
 }
 
 /* ─── Theme: Dark mode ─────────────────────────────────────────────────────── */
-.dark {
-  /* Panda semantic tokens */
+html.dark {
+  --color-background:       #0a0a0a;
   --color-surface:          #121212;
   --color-surface-raised:   #1c1c1d;
+  --color-border:           #2a2a2a;
   --color-border-subtle:    #1c1c1d;
-  --color-card-soft:        #1a1a1a;
   --color-text-primary:     #e1e1e3;
   --color-text-secondary:   #9a9a9c;
   --color-text-muted:       #737375;
   --color-text-inverse:     #0a0a0a;
   --color-overlay:          rgba(10, 10, 10, 0.5);
   --color-nav-bg:           rgba(0, 0, 0, 1);
+  --color-card-soft:        #1a1a1a;
   --shadow-primary-glow-sm: 0 0 16px 0 rgba(204, 53, 0, 0.25);
   --shadow-primary-glow-md: 0 0 24px 0 rgba(204, 53, 0, 0.35);
   --shadow-section-separate: 0 20px 52px -26px rgba(0, 0, 0, 0.82);
   --shadow-marquee-edge: 0 -16px 44px -22px rgba(0, 0, 0, 0.62), 0 16px 44px -22px rgba(0, 0, 0, 0.62);
   --shadow-footer-rule: inset 0 1px 0 rgba(255, 255, 255, 0.08);
-
-  /* Shadcn surface tokens — mapped to Panda dark values */
-  --background:           #0a0a0a;
-  --foreground:           #e1e1e3;
-  --card:                 #1c1c1d;
-  --card-foreground:      #e1e1e3;
-  --popover:              #1c1c1d;
-  --popover-foreground:   #e1e1e3;
-  --primary:              #cc3500;
-  --primary-foreground:   #ffffff;
-  --secondary:            #1c1c1d;
-  --secondary-foreground: #e1e1e3;
-  --muted:                #121212;
-  --muted-foreground:     #9a9a9c;
-  --accent:               #1a1a1a;
-  --accent-foreground:    #e1e1e3;
-  --destructive:          #c55550;
-  --border:               #2a2a2a;
-  --input:                #2a2a2a;
-  --ring:                 #cc3500;
-  --chart-1:              #cc3500;
-  --chart-2:              #27a589;
-  --chart-3:              #3a92cc;
-  --chart-4:              #f7b30b;
-  --chart-5:              #c55550;
-  --sidebar:                       #0a0a0a;
-  --sidebar-foreground:            #e1e1e3;
-  --sidebar-primary:               #cc3500;
-  --sidebar-primary-foreground:    #ffffff;
-  --sidebar-accent:                #1c1c1d;
-  --sidebar-accent-foreground:     #e1e1e3;
-  --sidebar-border:                #1c1c1d;
-  --sidebar-ring:                  #cc3500;
 }
 
 /* ─── Animations ────────────────────────────────────────────────────────────── */
@@ -384,6 +276,7 @@
   animation: marquee-y-down 60s linear infinite;
 }
 
+
 /* ─── Base ──────────────────────────────────────────────────────────────────── */
 /* Full-width chain: prevents flex items collapsing to min-content (Safari + nested flex). */
 html {
@@ -396,6 +289,9 @@ body {
   min-width: 0;
   margin: 0;
   overflow-x: hidden;
+  font-family: var(--font-body);
+  background-color: var(--color-background);
+  color: var(--color-text-primary);
 }
 
 #root {
@@ -407,58 +303,4 @@ body {
 
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-heading);
-}
-
-/* Shadcn @theme inline mappings — exposes shadcn vars as Tailwind utilities
-   (bg-background, text-foreground, border-border, bg-card, …) */
-@theme inline {
-  --font-heading: var(--font-sans);
-  --font-sans: var(--font-sans);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
-  --color-card: var(--card);
-  --color-foreground: var(--foreground);
-  --color-background: var(--background);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
-}
-
-@layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
-  body {
-    @apply bg-background text-foreground font-sans;
-  }
 }
