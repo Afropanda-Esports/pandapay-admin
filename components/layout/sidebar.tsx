@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { Logo } from '@/components/shared/logo';
 import { cn } from '@/lib/utils';
 import { NAV_ITEMS } from '@/components/layout/nav-items';
+import { useMe } from '@/hooks/use-me';
 
 interface SidebarProps {
   className?: string;
@@ -14,6 +15,11 @@ interface SidebarProps {
 
 export function Sidebar({ className, onNavigate }: Readonly<SidebarProps>) {
   const pathname = usePathname();
+  const { data: me } = useMe();
+
+  const visibleItems = NAV_ITEMS.filter(
+    (item) => !item.requiresRole || item.requiresRole === me?.role,
+  );
 
   return (
     <aside
@@ -35,7 +41,7 @@ export function Sidebar({ className, onNavigate }: Readonly<SidebarProps>) {
 
       <nav className="flex-1 overflow-y-auto px-3 py-4">
         <ul className="space-y-1">
-          {NAV_ITEMS.map((item) => {
+          {visibleItems.map((item) => {
             const isActive =
               pathname === item.href || pathname.startsWith(`${item.href}/`);
             const Icon = item.icon;

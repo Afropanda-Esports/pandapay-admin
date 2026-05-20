@@ -6,6 +6,9 @@ const PROTECTED_PATHS = [
   '/orders',
   '/products',
   '/audit',
+  '/admins',
+  '/pricing',
+  '/change-password',
 ];
 
 export function proxy(req: NextRequest) {
@@ -34,6 +37,9 @@ export const config = {
     '/orders/:path*',
     '/products/:path*',
     '/audit/:path*',
+    '/admins/:path*',
+    '/pricing/:path*',
+    '/change-password',
     '/login',
   ],
 };

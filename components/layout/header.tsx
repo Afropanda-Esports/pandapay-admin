@@ -1,14 +1,17 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LogOut, Menu } from 'lucide-react';
+import { KeyRound, LogOut, Menu, ShieldCheck } from 'lucide-react';
 
 import { useAuth } from '@/hooks/use-auth';
+import { useMe } from '@/hooks/use-me';
 import { NAV_ITEMS } from '@/components/layout/nav-items';
 import { Sidebar } from '@/components/layout/sidebar';
 import { ThemeToggle } from '@/components/layout/theme-toggle';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,11 +35,24 @@ function deriveTitle(pathname: string): string {
   return item?.label ?? '';
 }
 
+function initialsFor(name: string | undefined, email: string | undefined): string {
+  if (name) {
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) return (parts[0][0] + parts.at(-1)![0]).toUpperCase();
+    return parts[0].slice(0, 2).toUpperCase();
+  }
+  if (email) return email.slice(0, 2).toUpperCase();
+  return 'AD';
+}
+
 export function Header() {
   const pathname = usePathname();
   const { logout } = useAuth();
+  const { data: me } = useMe();
   const [mobileOpen, setMobileOpen] = useState(false);
   const title = deriveTitle(pathname);
+
+  const initials = initialsFor(me?.displayName, me?.email);
 
   return (
     <header className="flex h-14 items-center gap-3 border-b border-border bg-background px-4 md:px-6">
@@ -67,16 +83,34 @@ export function Header() {
           >
             <Avatar className="h-8 w-8">
               <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
-                AD
+                {initials}
               </AvatarFallback>
             </Avatar>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
+          <DropdownMenuContent align="end" className="w-64">
             <DropdownMenuGroup>
-              <DropdownMenuLabel className="text-xs text-muted-foreground">
-                Signed in as admin
+              <DropdownMenuLabel className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium">
+                    {me?.displayName ?? 'Admin'}
+                  </span>
+                  {me?.role === 'SUPER_ADMIN' && (
+                    <Badge className="bg-info-100 text-info-700 hover:bg-info-100 border-0 text-[10px] px-1.5 py-0">
+                      <ShieldCheck className="size-3" />
+                      Super
+                    </Badge>
+                  )}
+                </div>
+                <div className="text-xs font-normal text-muted-foreground break-all">
+                  {me?.email ?? '—'}
+                </div>
               </DropdownMenuLabel>
             </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem render={<Link href="/change-password" />}>
+              <KeyRound className="h-4 w-4" />
+              Change password
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={logout} className="text-destructive">
               <LogOut className="h-4 w-4" />

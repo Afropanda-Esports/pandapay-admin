@@ -1,5 +1,6 @@
 import { apiFetch } from './client';
 import type {
+  PricingMode,
   Product,
   ProductWithStats,
   ProductCategory,
@@ -17,8 +18,10 @@ export const getProduct = (id: string) =>
 export const createProduct = (body: {
   name: string;
   category: ProductCategory;
-  denomination: number;
   currency?: string;
+  pricingMode: PricingMode;
+  priceUsd?: number;
+  manualPriceNgn?: number;
 }) =>
   apiFetch<Product>('/admin/products', {
     method: 'POST',
@@ -27,9 +30,22 @@ export const createProduct = (body: {
 
 export const updateProduct = (
   id: string,
-  body: { name?: string; denomination?: number; isAvailable?: boolean },
+  body: { name?: string; isAvailable?: boolean },
 ) =>
   apiFetch<Product>(`/admin/products/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+
+export const updateProductPricing = (
+  id: string,
+  body: {
+    pricingMode?: PricingMode;
+    priceUsd?: number;
+    manualPriceNgn?: number;
+  },
+) =>
+  apiFetch<Product>(`/admin/products/${id}/pricing`, {
     method: 'PATCH',
     body: JSON.stringify(body),
   });
