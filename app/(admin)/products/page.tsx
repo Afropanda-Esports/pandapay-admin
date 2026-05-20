@@ -40,11 +40,11 @@ const CATEGORY_LABEL: Record<ProductCategory, string> = {
 
 const SKELETON_KEYS = ['s1', 's2', 's3', 's4', 's5', 's6'];
 
-const formatDenomination = (denomination: string, currency: string) => {
-  const n = Number.parseFloat(denomination);
+const formatPrice = (price: string, currency: string) => {
+  const n = Number.parseFloat(price);
   const formatted = Number.isFinite(n)
     ? n.toLocaleString('en-NG', { maximumFractionDigits: 2 })
-    : denomination;
+    : price;
   return currency === 'NGN' ? `₦${formatted}` : `${formatted} ${currency}`;
 };
 
@@ -105,7 +105,7 @@ function ProductCard({ product }: Readonly<{ product: ProductWithStats }>) {
         </div>
         <p className="text-xs text-muted-foreground">
           {CATEGORY_LABEL[product.category]} ·{' '}
-          {formatDenomination(product.denomination, product.currency)}
+          {formatPrice(product.snapshotNgnPrice, product.currency)}
         </p>
       </CardHeader>
       <CardContent>

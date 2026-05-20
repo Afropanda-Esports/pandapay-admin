@@ -37,10 +37,13 @@ const CATEGORY_OPTIONS: { value: ProductCategory; label: string }[] = [
   { value: 'AIRTIME', label: 'Airtime' },
 ];
 
+// V1 of the create dialog: collects an NGN price (MANUAL_NGN mode). The admin
+// can flip the product to GLOBAL_FX with a USD face value from the product
+// detail page (Phase D adds that UI).
 const schema = z.object({
   name: z.string().trim().min(2, 'Min 2 characters'),
   category: z.enum(['GIFT_CARD', 'GAME_TOP_UP', 'AIRTIME']),
-  denomination: z.coerce.number().positive('Must be greater than 0'),
+  manualPriceNgn: z.coerce.number().positive('Must be greater than 0'),
   currency: z.string().trim().min(3, 'Use a 3-letter code').max(3).default('NGN'),
 });
 
@@ -55,7 +58,7 @@ export function CreateProductDialog() {
     defaultValues: {
       name: '',
       category: undefined,
-      denomination: '' as unknown as number,
+      manualPriceNgn: '' as unknown as number,
       currency: 'NGN',
     },
   });
@@ -65,8 +68,9 @@ export function CreateProductDialog() {
       createProduct({
         name: data.name,
         category: data.category,
-        denomination: data.denomination,
         currency: data.currency,
+        pricingMode: 'MANUAL_NGN',
+        manualPriceNgn: data.manualPriceNgn,
       }),
     onSuccess: () => {
       toast.success('Product created');
@@ -105,7 +109,8 @@ export function CreateProductDialog() {
         <DialogHeader>
           <DialogTitle>Create product</DialogTitle>
           <DialogDescription>
-            Add a new gift card, game top-up, or airtime denomination.
+            Add a new gift card, game top-up, or airtime SKU. Price is set in
+            NGN; you can switch the product to USD-based pricing later.
           </DialogDescription>
         </DialogHeader>
 
@@ -153,21 +158,19 @@ export function CreateProductDialog() {
             </Field>
 
             <Field>
-              <FieldLabel htmlFor="product-denomination">
-                Denomination
-              </FieldLabel>
+              <FieldLabel htmlFor="product-price">Price (NGN)</FieldLabel>
               <Input
-                id="product-denomination"
+                id="product-price"
                 type="number"
                 inputMode="numeric"
                 min={1}
                 step="any"
                 placeholder="5000"
                 disabled={mutation.isPending}
-                {...form.register('denomination')}
+                {...form.register('manualPriceNgn')}
               />
               <FieldError>
-                {form.formState.errors.denomination?.message}
+                {form.formState.errors.manualPriceNgn?.message}
               </FieldError>
             </Field>
 

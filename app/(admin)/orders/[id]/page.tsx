@@ -200,10 +200,10 @@ function VoucherInfo({ order }: Readonly<{ order: OrderDetail }>) {
           )
         }
       />
-      {order.product?.denomination && (
+      {order.product?.snapshotNgnPrice && (
         <DetailRow
-          label="Denomination"
-          value={`${formatAmount(order.product.denomination)} ${
+          label="Price"
+          value={`${formatAmount(order.product.snapshotNgnPrice)} ${
             order.product.currency
           }`}
         />

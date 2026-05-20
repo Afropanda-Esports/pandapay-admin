@@ -3,6 +3,7 @@
 export type OrderStatus = 'PENDING' | 'PAID' | 'FULFILLED' | 'EXPIRED' | 'FAILED';
 export type PaymentMode = 'WALLET' | 'DIRECT_TRANSFER';
 export type ProductCategory = 'GIFT_CARD' | 'GAME_TOP_UP' | 'AIRTIME';
+export type AdminRole = 'SUPER_ADMIN' | 'ADMIN';
 export type AuditAction =
   | 'WALLET_CREDIT'
   | 'WALLET_DEBIT'
@@ -13,7 +14,20 @@ export type AuditAction =
   | 'USER_CREATED'
   | 'PIN_SET'
   | 'PIN_LOCKED'
-  | 'PIN_UNLOCKED';
+  | 'PIN_UNLOCKED'
+  | 'ADMIN_LOGIN'
+  | 'ADMIN_CREATED'
+  | 'ADMIN_UPDATED'
+  | 'ADMIN_DEACTIVATED'
+  | 'ADMIN_PASSWORD_RESET'
+  | 'ADMIN_PASSWORD_CHANGED'
+  | 'PRODUCT_CREATED'
+  | 'PRODUCT_UPDATED'
+  | 'PRODUCT_PRICING_UPDATED'
+  | 'PRODUCT_AVAILABILITY_CHANGED'
+  | 'VOUCHERS_UPLOADED'
+  | 'FX_RATE_UPDATED'
+  | 'PRODUCTS_RECOMPUTED';
 
 // ─── Pagination ───────────────────────────────────────────────────────────────
 
@@ -79,10 +93,12 @@ export interface OrderProductRef {
   id: string;
   name: string;
   category: ProductCategory;
-  denomination: string;
+  snapshotNgnPrice: string;
   currency: string;
   isAvailable: boolean;
 }
+
+export type PricingMode = 'GLOBAL_FX' | 'MANUAL_NGN';
 
 export interface OrderUserRef {
   id: string;
@@ -122,13 +138,31 @@ export interface Product {
   id: string;
   name: string;
   category: ProductCategory;
-  denomination: string;
   currency: string;
   isAvailable: boolean;
+  pricingMode: PricingMode;
+  priceUsd: string | null;
+  manualPriceNgn: string | null;
+  snapshotNgnPrice: string;
+  snapshotAt: string;
 }
 
 export interface ProductWithStats extends Product {
   voucherStats: VoucherStats;
+}
+
+// ─── Pricing ──────────────────────────────────────────────────────────────────
+
+export interface ExchangeRate {
+  ngnPerUsd: number;
+  effectiveFrom: string;
+  setById: string | null;
+  note: string | null;
+}
+
+export interface ExchangeRateHistoryItem extends ExchangeRate {
+  id: string;
+  createdAt: string;
 }
 
 // ─── Audit ────────────────────────────────────────────────────────────────────
@@ -139,4 +173,31 @@ export interface AuditLog {
   action: AuditAction;
   metadata: Record<string, unknown>;
   createdAt: string;
+}
+
+// ─── Admin Users ──────────────────────────────────────────────────────────────
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  displayName: string;
+  role: AdminRole;
+  isActive: boolean;
+  mustChangePassword: boolean;
+  lastLoginAt: string | null;
+  createdAt: string;
+}
+
+export interface AdminDirectoryItem {
+  id: string;
+  displayName: string;
+  role: AdminRole;
+}
+
+export interface LoginResponse {
+  access_token: string;
+  must_change_password: boolean;
+  role: AdminRole;
+  email: string;
+  display_name: string;
 }

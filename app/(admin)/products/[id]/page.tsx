@@ -12,6 +12,7 @@ import Link from 'next/link';
 import { use } from 'react';
 import { toast } from 'sonner';
 
+import { PricingCard } from '@/components/features/products/pricing-card';
 import { UploadVouchersDialog } from '@/components/features/products/upload-vouchers-dialog';
 import { PageHeader } from '@/components/shared/page-header';
 import { Badge } from '@/components/ui/badge';
@@ -34,11 +35,11 @@ const CATEGORY_LABEL: Record<ProductCategory, string> = {
   AIRTIME: 'Airtime',
 };
 
-const formatDenomination = (denomination: string, currency: string) => {
-  const n = Number.parseFloat(denomination);
+const formatPrice = (price: string, currency: string) => {
+  const n = Number.parseFloat(price);
   const formatted = Number.isFinite(n)
     ? n.toLocaleString('en-NG', { maximumFractionDigits: 2 })
-    : denomination;
+    : price;
   return currency === 'NGN' ? `₦${formatted}` : `${formatted} ${currency}`;
 };
 
@@ -84,10 +85,6 @@ function DetailsCard({
           <DetailRow
             label="Category"
             value={CATEGORY_LABEL[product.category]}
-          />
-          <DetailRow
-            label="Denomination"
-            value={formatDenomination(product.denomination, product.currency)}
           />
           <DetailRow label="Currency" value={product.currency} />
           <DetailRow
@@ -281,8 +278,8 @@ export default function ProductDetailPage({
     <div>
       <PageHeader
         title={product.name}
-        description={`${CATEGORY_LABEL[product.category]} · ${formatDenomination(
-          product.denomination,
+        description={`${CATEGORY_LABEL[product.category]} · ${formatPrice(
+          product.snapshotNgnPrice,
           product.currency,
         )}`}
         actions={
@@ -301,6 +298,10 @@ export default function ProductDetailPage({
           product={product}
           onToggle={() => toggleAvailability.mutate(!product.isAvailable)}
           isToggling={toggleAvailability.isPending}
+        />
+        <PricingCard
+          key={`${product.id}-${product.pricingMode}-${product.priceUsd ?? ''}-${product.manualPriceNgn ?? ''}`}
+          product={product}
         />
         <VoucherStatsCard product={product} />
       </div>

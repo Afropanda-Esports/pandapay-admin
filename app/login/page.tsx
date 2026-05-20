@@ -2,6 +2,7 @@
 
 import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -31,6 +32,7 @@ type FormValues = z.infer<typeof schema>;
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
   const { saveToken } = useAuth();
   const [submitting, setSubmitting] = useState(false);
 
@@ -42,8 +44,15 @@ function LoginForm() {
   const onSubmit = form.handleSubmit(async (data) => {
     setSubmitting(true);
     try {
-      const { access_token } = await login(data.email, data.password);
-      saveToken(access_token);
+      const res = await login(data.email, data.password);
+      saveToken(res.access_token);
+      // Invalidate any stale /me cache from a previous session.
+      queryClient.removeQueries({ queryKey: ['me'] });
+
+      if (res.must_change_password) {
+        router.push('/change-password');
+        return;
+      }
       const redirect = searchParams.get('redirect') ?? '/dashboard';
       router.push(redirect);
     } catch (error) {
