@@ -29,10 +29,10 @@ import { cn } from '@/lib/utils';
 import type { ProductWithStats } from '@/lib/types';
 
 const schema = z.object({
-  ngnPerUsd: z.coerce
+  markupPct: z.coerce
     .number({ message: 'Enter a number' })
-    .positive('Must be greater than 0')
-    .max(1_000_000, 'That looks too large'),
+    .min(0, 'Must be at least 0')
+    .max(100, 'Must be 100% or less'),
   note: z.string().trim().max(255).optional(),
 });
 
@@ -91,25 +91,25 @@ function formatRecomputedSummary(affected: number): string {
 const PREVIEW_LIMIT = 8;
 
 export function SetRateForm({
-  currentRate,
-}: Readonly<{ currentRate: number | null }>) {
+  currentMarkup,
+  oracleRate,
+}: Readonly<{ currentMarkup: number; oracleRate: number | null }>) {
   const queryClient = useQueryClient();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      ngnPerUsd: currentRate ?? '',
+      markupPct: currentMarkup / 100,
       note: '',
     },
   });
 
-  // Watch the input for the live preview. z.coerce.number() makes the input
-  // type `unknown`, so we use Number() which handles strings, numbers, null,
-  // and undefined all the way through.
-  const watchedRate = form.watch('ngnPerUsd');
-  const draftRate = Number(watchedRate);
-  const isDraftValid =
-    Number.isFinite(draftRate) && draftRate > 0 && draftRate !== currentRate;
+  const watchedMarkup = form.watch('markupPct');
+  const draftMarkupPct = Number(watchedMarkup);
+  const isDraftValid = Number.isFinite(draftMarkupPct) && draftMarkupPct >= 0;
+  
+  const currentRate = oracleRate ? oracleRate * (1 + currentMarkup / 10000) : null;
+  const draftRate = oracleRate && isDraftValid ? oracleRate * (1 + (draftMarkupPct * 100) / 10000) : null;
 
   const { data: products } = useQuery({
     queryKey: ['products'],
@@ -120,8 +120,8 @@ export function SetRateForm({
     enabled: isDraftValid,
   });
 
-  const previewRows = isDraftValid ? buildPreview(products, draftRate) : [];
-  const overallDelta = isDraftValid
+  const previewRows = isDraftValid && draftRate ? buildPreview(products, draftRate) : [];
+  const overallDelta = isDraftValid && draftRate
     ? describeOverallDelta(currentRate, draftRate)
     : null;
   const hasGlobalFxProducts = (products ?? []).some(
@@ -130,7 +130,7 @@ export function SetRateForm({
 
   const mutation = useMutation({
     mutationFn: (data: z.output<typeof schema>) =>
-      setRate({ ngnPerUsd: data.ngnPerUsd, note: data.note }),
+      setRate({ markupBps: Math.round(data.markupPct * 100), note: data.note }),
     onSuccess: (res) => {
       const recomputed = formatRecomputedSummary(res.affected);
       toast.success(
@@ -139,7 +139,7 @@ export function SetRateForm({
       queryClient.invalidateQueries({ queryKey: ['pricing-rate'] });
       queryClient.invalidateQueries({ queryKey: ['pricing-rate-history'] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
-      form.reset({ ngnPerUsd: res.rate.ngnPerUsd, note: '' });
+      form.reset({ markupPct: (res.rate.markupBps ?? 0) / 100, note: '' });
     },
     onError: (err) => {
       const message =
@@ -158,29 +158,29 @@ export function SetRateForm({
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <Coins className="size-4" />
-          Update rate
+          Your markup
         </CardTitle>
         <CardDescription>
-          Save to recompute every GLOBAL_FX product in one transaction. MANUAL_NGN
-          products are not affected.
+          Percentage markup applied to the live oracle rate. Changes take effect immediately.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={onSubmit} noValidate>
           <FieldGroup>
             <Field>
-              <FieldLabel htmlFor="rate-value">NGN per $1</FieldLabel>
+              <FieldLabel htmlFor="markup-value">Markup (%)</FieldLabel>
               <Input
-                id="rate-value"
+                id="markup-value"
                 type="number"
                 inputMode="decimal"
-                step="0.0001"
-                min="0.0001"
-                disabled={mutation.isPending}
-                {...form.register('ngnPerUsd')}
+                step="0.1"
+                min="0"
+                max="100"
+                disabled={mutation.isPending || !oracleRate}
+                {...form.register('markupPct')}
               />
               <FieldError>
-                {form.formState.errors.ngnPerUsd?.message}
+                {form.formState.errors.markupPct?.message}
               </FieldError>
             </Field>
 
@@ -195,7 +195,7 @@ export function SetRateForm({
               <FieldError>{form.formState.errors.note?.message}</FieldError>
             </Field>
 
-            {isDraftValid && (
+            {isDraftValid && draftRate != null && (
               <RatePreview
                 draftRate={draftRate}
                 overallDelta={overallDelta}

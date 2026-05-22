@@ -8,6 +8,7 @@ import {
   ArrowLeft,
   RefreshCw,
   Send,
+  PackageCheck,
 } from 'lucide-react';
 import Link from 'next/link';
 import { use } from 'react';
@@ -26,7 +27,7 @@ import {
 } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ApiError } from '@/lib/api/client';
-import { getOrder, resendOrder } from '@/lib/api/orders';
+import { getOrder, resendOrder, fulfillOrder } from '@/lib/api/orders';
 import type { OrderDetail, PaymentMode } from '@/lib/types';
 
 const PAYMENT_MODE_LABEL: Record<PaymentMode, string> = {
@@ -242,6 +243,20 @@ export default function OrderDetailPage({
     },
   });
 
+  const fulfillMutation = useMutation({
+    mutationFn: () => fulfillOrder(id),
+    onSuccess: () => {
+      toast.success('Order fulfilled');
+      queryClient.invalidateQueries({ queryKey: ['order', id] });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+    },
+    onError: (err) => {
+      const message =
+        err instanceof ApiError ? err.message : 'Failed to fulfill order';
+      toast.error(message);
+    },
+  });
+
   const backLink = (
     <Button variant="ghost" size="sm" render={<Link href="/orders" />}>
       <ArrowLeft className="size-4" />
@@ -275,10 +290,28 @@ export default function OrderDetailPage({
 
   const isInconsistent = order.voucherAssigned && !order.voucherIsUsed;
   const canResend = order.status === 'FULFILLED';
+  const canFulfill = order.status === 'PAID';
 
   const actions = (
     <div className="flex items-center gap-2">
       {backLink}
+      {canFulfill && (
+        <ConfirmDialog
+          trigger={
+            <Button disabled={fulfillMutation.isPending} variant="secondary">
+              <PackageCheck className="size-4" />
+              Fulfill order
+            </Button>
+          }
+          title="Force-fulfill order?"
+          description="Trigger fulfillment for this order? A voucher will be claimed and sent to the customer immediately."
+          confirmLabel="Fulfill"
+          isPending={fulfillMutation.isPending}
+          onConfirm={async () => {
+            await fulfillMutation.mutateAsync();
+          }}
+        />
+      )}
       {canResend && (
         <ConfirmDialog
           trigger={

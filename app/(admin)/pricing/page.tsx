@@ -35,38 +35,43 @@ import type { AdminDirectoryItem, ExchangeRateHistoryItem } from '@/lib/types';
 
 const HISTORY_SKELETON = ['h1', 'h2', 'h3', 'h4'];
 
-function CurrentRateCard({
-  ngnPerUsd,
-  effectiveFrom,
-  note,
+import { getOracleRate } from '@/lib/api/pricing';
+
+function OracleRateCard({
+  oracleRate,
+  lastFetchedAt,
 }: Readonly<{
-  ngnPerUsd: number;
-  effectiveFrom: string;
-  note: string | null;
+  oracleRate: number | null;
+  lastFetchedAt: string | null;
 }>) {
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <Coins className="size-4" />
-          Current rate
+          Live oracle rate
         </CardTitle>
         <CardDescription>
-          Applied to every GLOBAL_FX product&apos;s NGN price.
+          Source: CoinGecko USDT/NGN
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-2">
-        <p className="font-heading text-4xl font-bold tabular-nums">
-          ₦{ngnPerUsd.toLocaleString('en-NG', { maximumFractionDigits: 4 })}{' '}
-          <span className="text-base font-normal text-muted-foreground">
-            / $1
-          </span>
-        </p>
-        <p className="text-xs text-muted-foreground">
-          Effective {format(parseISO(effectiveFrom), 'PPpp')}
-        </p>
-        {note && (
-          <p className="text-xs text-muted-foreground italic">{note}</p>
+        {oracleRate ? (
+          <>
+            <p className="font-heading text-4xl font-bold tabular-nums">
+              ₦{oracleRate.toLocaleString('en-NG', { maximumFractionDigits: 4 })}{' '}
+              <span className="text-base font-normal text-muted-foreground">
+                / $1
+              </span>
+            </p>
+            {lastFetchedAt && (
+              <p className="text-xs text-muted-foreground">
+                Updated {formatDistanceToNow(parseISO(lastFetchedAt), { addSuffix: true })}
+              </p>
+            )}
+          </>
+        ) : (
+          <p className="text-sm text-muted-foreground">No oracle rate available.</p>
         )}
       </CardContent>
     </Card>
@@ -160,7 +165,9 @@ function RateHistoryTable({
       <table className="w-full text-sm">
         <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
           <tr>
-            <th className="px-3 py-2 font-medium">Rate</th>
+            <th className="px-3 py-2 font-medium">Effective Rate</th>
+            <th className="px-3 py-2 font-medium">Oracle</th>
+            <th className="px-3 py-2 font-medium">Markup</th>
             <th className="px-3 py-2 font-medium">Set by</th>
             <th className="px-3 py-2 font-medium">Note</th>
             <th className="px-3 py-2 font-medium">When</th>
@@ -176,6 +183,12 @@ function RateHistoryTable({
               >
                 <td className="px-3 py-2 tabular-nums">
                   ₦{row.ngnPerUsd.toLocaleString('en-NG', { maximumFractionDigits: 4 })}
+                </td>
+                <td className="px-3 py-2 tabular-nums">
+                  {row.oracleNgnPerUsd ? `₦${row.oracleNgnPerUsd.toLocaleString('en-NG', { maximumFractionDigits: 4 })}` : '—'}
+                </td>
+                <td className="px-3 py-2 tabular-nums">
+                  {row.markupBps != null ? `${(row.markupBps / 100).toFixed(2)}%` : '—'}
                 </td>
                 <td className="px-3 py-2">
                   {actorName(row.setById, lookup)}
@@ -237,6 +250,16 @@ export default function PricingPage() {
   });
 
   const {
+    data: oracle,
+    isLoading: oracleLoading,
+    isError: oracleError,
+  } = useQuery({
+    queryKey: ['pricing-oracle'],
+    queryFn: getOracleRate,
+    refetchInterval: 60_000,
+  });
+
+  const {
     data: history,
     isLoading: historyLoading,
   } = useQuery({
@@ -272,22 +295,41 @@ export default function PricingPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          {rateLoading ? (
+          {rateLoading || oracleLoading ? (
             <CurrentRateSkeleton />
-          ) : rate ? (
-            <CurrentRateCard
-              ngnPerUsd={rate.ngnPerUsd}
-              effectiveFrom={rate.effectiveFrom}
-              note={rate.note}
-            />
-          ) : (
+          ) : oracleError || rateError ? (
             <NoRateCard />
+          ) : (
+            <OracleRateCard
+              oracleRate={oracle?.oracleRate ?? null}
+              lastFetchedAt={oracle?.lastFetchedAt ?? null}
+            />
           )}
 
           {isSuperAdmin && (
-            <SetRateForm currentRate={rate?.ngnPerUsd ?? null} />
+            <SetRateForm 
+              currentMarkup={rate?.markupBps ?? 500}
+              oracleRate={oracle?.oracleRate ?? null}
+            />
           )}
         </div>
+      )}
+      
+      {rate && (
+        <Card className="mt-4 bg-muted/30">
+          <CardContent className="py-6 text-center">
+            <p className="text-sm text-muted-foreground uppercase tracking-wide mb-2">Effective rate</p>
+            <p className="font-heading text-4xl font-bold tabular-nums">
+              ₦{rate.ngnPerUsd.toLocaleString('en-NG', { maximumFractionDigits: 4 })}{' '}
+              <span className="text-base font-normal text-muted-foreground">
+                / $1
+              </span>
+            </p>
+            <p className="text-sm text-muted-foreground mt-2">
+              This is the rate applied to all GLOBAL_FX products.
+            </p>
+          </CardContent>
+        </Card>
       )}
 
       <div className="mt-6">
