@@ -34,3 +34,8 @@ export const resendOrder = (id: string) =>
   apiFetch<{ success: boolean }>(`/admin/orders/${id}/resend`, {
     method: 'POST',
   });
+
+export const fulfillOrder = (id: string) =>
+  apiFetch<{ success: boolean }>(`/admin/orders/${id}/fulfill`, {
+    method: 'POST',
+  });

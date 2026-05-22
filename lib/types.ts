@@ -11,6 +11,8 @@ export type AuditAction =
   | 'ORDER_FAILED'
   | 'ORDER_EXPIRED'
   | 'ADMIN_RESEND'
+  | 'ADMIN_WALLET_CREDIT'
+  | 'ADMIN_FORCE_FULFILL'
   | 'USER_CREATED'
   | 'PIN_SET'
   | 'PIN_LOCKED'
@@ -64,6 +66,19 @@ export interface Stats {
   };
 }
 
+// ─── Transactions ──────────────────────────────────────────────────────────────
+
+export type TransactionType = 'CREDIT' | 'DEBIT';
+
+export interface Transaction {
+  id: string;
+  type: TransactionType;
+  amount: number;
+  reference: string;
+  orderId: string | null;
+  createdAt: string;
+}
+
 // ─── Users ────────────────────────────────────────────────────────────────────
 
 export interface UserListItem {
@@ -83,6 +98,11 @@ export interface PinStatus {
 export interface UserDetail extends UserListItem {
   pinStatus: PinStatus;
   recentOrders: Order[];
+  virtualAccount: {
+    accountNumber: string;
+    bankName: string;
+    accountName: string;
+  } | null;
 }
 
 // ─── Orders ───────────────────────────────────────────────────────────────────
@@ -156,6 +176,8 @@ export interface ProductWithStats extends Product {
 export interface ExchangeRate {
   ngnPerUsd: number;
   effectiveFrom: string;
+  markupBps: number;
+  oracleNgnPerUsd: number | null;
   setById: string | null;
   note: string | null;
 }
