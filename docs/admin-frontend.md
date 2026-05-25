@@ -5,6 +5,8 @@
 > **Frontend dev URL:** `http://localhost:3001`
 > **Auth:** JWT stored in a cookie (`admin_token`), enforced by Next's `proxy.ts` on every protected route.
 
+**Integration status (2026-05-19):** The app shell and most pages are implemented. See **[INTEGRATION.md](./INTEGRATION.md)** for which API calls succeed vs return 404. Canonical contract: [pandapay-be/INTEGRATION.md](../../pandapay-be/INTEGRATION.md).
+
 ---
 
 ## Table of Contents
@@ -30,49 +32,26 @@
 
 ## 1. Codebase Status
 
-The project is already bootstrapped. Key facts:
+**Build state:** Phases 0–8 from [implementation-plan.md](./implementation-plan.md) are **done** — auth, dashboard, products, orders, users, audit, pricing/admins UI shells, and shared components all exist in the repo.
 
 | Concern | Status |
 |---|---|
-| Next.js | **16.2.4** (App Router) — installed |
-| React | **19.2.4** — installed |
-| TypeScript | configured (`tsconfig.json`, alias `@/*` → project root) |
-| Tailwind | **v4** via `@tailwindcss/postcss` — installed |
-| Theme | Panda design system in [app/globals.css](../app/globals.css) (Satoshi font, primary/secondary/neutral/semantic colors, light + dark mode) |
-| Package manager | **pnpm** (lockfile present) |
-| Folder convention | **no `src/`** — `app/` lives at project root; non-route code lives in `lib/`, `components/`, `hooks/` at root |
-| Dev port | **3001** (set in `package.json` `dev` script — see Phase 0 in [implementation-plan.md](./implementation-plan.md)) |
+| Next.js | **16.2.4** (App Router) |
+| React | **19.2.4** |
+| TanStack Query, RHF, Zod, Recharts, nuqs, date-fns, js-cookie | **Installed** (`package.json`) |
+| Shadcn/ui primitives | **Installed** under `components/ui/` |
+| API clients | `lib/api/*.ts` — see [INTEGRATION.md](./INTEGRATION.md) for BE coverage |
+| Routes | `app/login`, `app/(admin)/*`, `app/change-password` |
+| Theme | [app/globals.css](../app/globals.css) — light + dark; Satoshi `@font-face` optional |
+| Dev port | **3001** (`pnpm dev`) |
 
-### What's installed already
+### Backend gaps (admin UI ahead of API)
 
-```
-next@16.2.4
-react@19.2.4
-react-dom@19.2.4
-tailwindcss@4
-@tailwindcss/postcss
-typescript@5
-eslint@9
-eslint-config-next@16.2.4
-```
+These pages render but call **unimplemented** backend routes: `/pricing`, `/admins`, `/change-password`, user wallet credit/transactions, product pricing PATCH. Details: [INTEGRATION.md](./INTEGRATION.md).
 
-### What's NOT installed yet (install per phase, see [implementation-plan.md](./implementation-plan.md))
+### Missing assets (optional)
 
-- `@tanstack/react-query`, `@tanstack/react-query-devtools`
-- `react-hook-form`, `@hookform/resolvers`, `zod`
-- `recharts`
-- `js-cookie`, `@types/js-cookie`
-- `date-fns`
-- `nuqs`
-- `usehooks-ts`
-- `lucide-react`
-- All Shadcn/ui components
-
-### Missing assets
-
-The Panda theme references local Satoshi `.otf` files at `app/assets/satoshi/Satoshi-{Regular,Italic,Bold,BoldItalic}.otf`. These files **do not exist yet**. Until they're added, the browser falls back to `sans-serif`. Drop the files into `app/assets/satoshi/` to enable the Satoshi rendering.
-
-> **Recommended alternative:** use `next/font/local` to load the OTFs — gives you preloading and FOIT/FOUT control out of the box. See `app/layout.tsx` integration in §8.
+Satoshi `.otf` files at `app/assets/satoshi/` are still optional — theme falls back to `sans-serif` without them.
 
 ### Next 16 breaking changes you must know
 
@@ -197,6 +176,8 @@ panda-admin/
 
 All routes except login require `Authorization: Bearer <token>`.
 
+> **Availability:** Not every endpoint below exists on pandapay-be yet. For a live matrix (implemented vs 404), use [INTEGRATION.md](./INTEGRATION.md) and [pandapay-be/INTEGRATION.md](../../pandapay-be/INTEGRATION.md). This section documents **intended** contracts for frontend types and future BE work.
+
 > **Decimal gotcha:** TypeORM serializes `DECIMAL` database columns as **strings** in JSON — so `amount` and `denomination` always come back as `"5000.00"`, not `5000`. Parse with `parseFloat()` before doing arithmetic or display formatting.
 
 ---
@@ -218,7 +199,11 @@ POST /admin/auth/login
 **Response `200`:**
 ```json
 {
-  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc0NjUzMDAwMCwiZXhwIjoxNzQ2NjE2NDAwfQ.signature"
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "email": "admin@pandapay.io",
+  "display_name": "PandaPay Admin",
+  "role": "SUPER_ADMIN",
+  "must_change_password": false
 }
 ```
 
