@@ -1,0 +1,723 @@
+# PandaPay — Cursor Rules & Engineering Best Practices
+# Polyglot Fintech: Rust (Pricing Engine, Fraud Detection, Chain Listeners) + Node.js/NestJS (Everything Else)
+# Version: 1.0
+
+---
+
+## 0. GROUND RULES
+
+You are working on a fintech payment platform processing real money and crypto.
+Every decision has financial consequence. Default to correctness over cleverness.
+When in doubt: explicit over implicit, verbose over terse, boring over clever.
+
+---
+
+## 1. MONEY & ARITHMETIC
+
+### Never use floating point for money. Ever.
+
+```typescript
+// ❌ WRONG — floats lose precision
+const price = 16000.5 * 1.1; // 17600.549999999999
+
+// ✅ CORRECT — integers in minor units (kobo for NGN, lamports for SOL)
+const priceKobo = BigInt(1600050) * BigInt(110) / BigInt(100);
+
+// ✅ CORRECT — use decimal libraries
+import Decimal from 'decimal.js';
+const price = new Decimal('16000.50').mul('1.1'); // exact
+```
+
+```rust
+// ❌ WRONG
+let price: f64 = 16000.5 * 1.1;
+
+// ✅ CORRECT
+use rust_decimal::Decimal;
+use rust_decimal_macros::dec;
+let price = dec!(16000.50) * dec!(1.1);
+```
+
+### Rules
+- Store all NGN amounts as integer kobo in the database (`amount_kobo BIGINT`)
+- Store all USDC amounts as integer with 6 decimal places (`amount_usdc_micro BIGINT`)
+- Never divide before multiplying — always multiply first to avoid truncation
+- All exchange rate calculations use `rust_decimal` (Rust) or `decimal.js` (Node.js)
+- Never round mid-calculation — round only at the final output boundary
+- Always specify rounding mode explicitly: `ROUND_HALF_UP` for display, `ROUND_DOWN` for fees
+- Amounts in API responses are strings, not numbers: `"amount": "16000.50"` not `"amount": 16000.5`
+
+---
+
+## 2. IDEMPOTENCY — NON-NEGOTIABLE
+
+Every payment operation must be idempotent. Webhooks retry. Networks fail. Users double-tap.
+
+### Pattern: Redis idempotency gate
+
+```typescript
+// Node.js — Payment Settlement Service
+async function processPaystackWebhook(payload: PaystackWebhookPayload): Promise<void> {
+  const idempotencyKey = `pstk:${payload.data.reference}`;
+
+  // Gate: atomic check-and-set
+  const isNew = await redis.set(idempotencyKey, '1', 'EX', 86400, 'NX');
+  if (!isNew) {
+    logger.info({ ref: payload.data.reference }, 'Duplicate webhook — skipped');
+    return; // 200 OK — Paystack won't retry
+  }
+
+  // Safe to process
+  await processPayment(payload);
+}
+```
+
+```rust
+// Rust — Chain Listener idempotency
+async fn maybe_publish(
+    event: &PaymentEvent,
+    redis: &RedisPool,
+    bus: &MessageBus,
+) -> Result<()> {
+    let key = format!("confirmed_txs:{}:{}", event.chain, event.tx_hash);
+    let is_new: bool = redis.set_nx(&key, "1").await?;
+    if !is_new {
+        tracing::info!(tx_hash = %event.tx_hash, "Duplicate tx — dropped");
+        return Ok(());
+    }
+    redis.expire(&key, 86400).await?;
+    bus.publish("PaymentConfirmed", event).await?;
+    Ok(())
+}
+```
+
+### Rules
+- Every inbound webhook gets an idempotency key before any DB write
+- Idempotency keys: `{provider}:{reference}` for Paystack, `{chain}:{tx_hash}` for crypto
+- TTL on idempotency keys: 24 hours minimum
+- Idempotency check must happen BEFORE any database write or state mutation
+- Return 200 OK to webhook providers even on duplicate — they will retry on non-2xx
+
+---
+
+## 3. PAYMENT STATE MACHINE
+
+Order status is a strict state machine. Transitions are one-way. No skipping states.
+
+```
+CREATED → AWAITING_PAYMENT → PAYMENT_CONFIRMED → FULFILLING → DELIVERED
+                                                              ↘ REFUNDED
+          ↓ (TTL expired)
+        EXPIRED
+```
+
+### Rules
+- Validate current state before every transition — throw if invalid
+- Persist state change and emit domain event in the same DB transaction
+- Never mutate order status outside the Orders Service
+- Log every state transition with: `orderId`, `from`, `to`, `triggeredBy`, `timestamp`
+
+```typescript
+// ✅ CORRECT — validate transition, write, emit in one atomic unit
+async function confirmPayment(orderId: string, paymentId: string): Promise<void> {
+  await this.db.$transaction(async (tx) => {
+    const order = await tx.order.findUniqueOrThrow({ where: { id: orderId } });
+
+    if (order.status !== OrderStatus.AWAITING_PAYMENT) {
+      throw new InvalidTransitionError(order.status, OrderStatus.PAYMENT_CONFIRMED);
+    }
+
+    await tx.order.update({
+      where: { id: orderId },
+      data: { status: OrderStatus.PAYMENT_CONFIRMED, paymentId },
+    });
+
+    await this.eventBus.publish('PaymentConfirmed', { orderId }); // inside tx
+  });
+}
+```
+
+---
+
+## 4. ERROR HANDLING
+
+### Rust — typed errors, no panics in hot paths
+
+```rust
+// ❌ WRONG — panics in production
+let amount = payload.amount.parse::<Decimal>().unwrap();
+
+// ✅ CORRECT — propagate with context
+use anyhow::Context;
+let amount = payload.amount
+    .parse::<Decimal>()
+    .with_context(|| format!("Invalid amount string: '{}'", payload.amount))?;
+```
+
+```rust
+// ✅ CORRECT — domain error enum
+#[derive(Debug, thiserror::Error)]
+pub enum PaymentError {
+    #[error("Duplicate transaction: {tx_hash}")]
+    DuplicateTransaction { tx_hash: String },
+    #[error("Amount mismatch: expected {expected}, got {actual}")]
+    AmountMismatch { expected: Decimal, actual: Decimal },
+    #[error("Chain listener disconnected: {chain}")]
+    ListenerDisconnected { chain: String },
+    #[error("Redis error: {0}")]
+    Redis(#[from] redis::RedisError),
+}
+```
+
+### Node.js — never swallow errors silently
+
+```typescript
+// ❌ WRONG — silent failure
+try {
+  await processPayment(order);
+} catch (e) {
+  console.log(e); // swallowed — no alert, no retry
+}
+
+// ✅ CORRECT — log, metric, rethrow or handle explicitly
+try {
+  await processPayment(order);
+} catch (error) {
+  logger.error({ orderId: order.id, error }, 'Payment processing failed');
+  metrics.increment('payment.processing.error', { method: order.paymentMethod });
+  throw error; // let NestJS exception filter handle HTTP response
+}
+```
+
+### Rules
+- No `unwrap()` or `expect()` in Rust production paths — only in tests
+- No empty catch blocks in Node.js
+- All errors must include context: `orderId`, `method`, `chain` where applicable
+- Payment errors trigger an alert (Slack/PagerDuty) — not just a log
+- Distinguish retryable errors (network timeout) from terminal errors (invalid reference)
+
+---
+
+## 5. WEBHOOK SECURITY
+
+### Verify every inbound webhook signature before processing
+
+```typescript
+// Paystack webhook verification
+import crypto from 'crypto';
+
+function verifyPaystackSignature(
+  payload: Buffer,
+  signature: string,
+  secret: string,
+): boolean {
+  const hash = crypto
+    .createHmac('sha512', secret)
+    .update(payload)
+    .digest('hex');
+  return crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(signature));
+}
+
+// NestJS guard
+@Injectable()
+export class PaystackWebhookGuard implements CanActivate {
+  canActivate(context: ExecutionContext): boolean {
+    const request = context.switchToHttp().getRequest<RawBodyRequest>();
+    const signature = request.headers['x-paystack-signature'] as string;
+    const isValid = verifyPaystackSignature(
+      request.rawBody,
+      signature,
+      process.env.PAYSTACK_SECRET_KEY,
+    );
+    if (!isValid) throw new UnauthorizedException('Invalid webhook signature');
+    return true;
+  }
+}
+```
+
+### Rules
+- Always use `crypto.timingSafeEqual` — never `===` for signature comparison (timing attack)
+- Validate signature BEFORE parsing JSON body
+- Webhook endpoints require raw body access — configure NestJS `rawBody: true`
+- Reject and alert on invalid signatures — do not silently ignore
+- Whitelist Paystack IP ranges in security groups as a secondary control
+
+---
+
+## 6. SECRETS & CONFIGURATION
+
+```typescript
+// ❌ WRONG — hardcoded secrets
+const paystackKey = 'sk_live_xxxxxxxxxxxx';
+
+// ❌ WRONG — process.env without validation
+const key = process.env.PAYSTACK_SECRET_KEY; // could be undefined
+
+// ✅ CORRECT — validated config module (NestJS)
+import { IsString, IsNotEmpty } from 'class-validator';
+
+export class AppConfig {
+  @IsString() @IsNotEmpty()
+  PAYSTACK_SECRET_KEY: string;
+
+  @IsString() @IsNotEmpty()
+  REDIS_URL: string;
+
+  @IsString() @IsNotEmpty()
+  DATABASE_URL: string;
+}
+```
+
+```rust
+// ✅ CORRECT — typed config with validation at startup
+use config::{Config, Environment};
+use serde::Deserialize;
+
+#[derive(Deserialize)]
+pub struct AppConfig {
+    pub redis_url: String,
+    pub pyth_endpoint: String,
+    pub grpc_port: u16,
+}
+
+// Fail fast at startup if config is invalid — never at request time
+pub fn load_config() -> Result<AppConfig, config::ConfigError> {
+    Config::builder()
+        .add_source(Environment::default())
+        .build()?
+        .try_deserialize()
+}
+```
+
+### Rules
+- No secrets in source code, `.env` files committed to git, or logs
+- All secrets via AWS Secrets Manager or HashiCorp Vault — injected as env vars at runtime
+- Config validation runs at startup — if invalid, process exits immediately
+- Separate secret per environment: `PAYSTACK_SECRET_KEY_TEST`, `PAYSTACK_SECRET_KEY_LIVE`
+- Never log secrets, API keys, wallet private keys, or full card/account numbers
+- Never log full webhook payloads — log only reference IDs
+
+---
+
+## 7. DATABASE
+
+### Prisma rules
+
+```typescript
+// ❌ WRONG — raw string interpolation (SQL injection)
+await db.$queryRaw(`SELECT * FROM orders WHERE id = '${orderId}'`);
+
+// ✅ CORRECT — parameterised
+await db.$queryRaw`SELECT * FROM orders WHERE id = ${orderId}`;
+
+// ✅ CORRECT — use Prisma client methods
+await db.order.findUniqueOrThrow({ where: { id: orderId } });
+
+// ❌ WRONG — select * in production queries
+await db.order.findMany();
+
+// ✅ CORRECT — select only what you need
+await db.order.findMany({
+  select: { id: true, status: true, userId: true, createdAt: true },
+  where: { status: OrderStatus.AWAITING_PAYMENT },
+});
+```
+
+### Rules
+- All financial fields stored as `BigInt` (kobo/micro-units) — never `Float` or `Decimal` in Prisma schema
+- Every table has `created_at` and `updated_at` timestamps — auto-managed
+- Every migration is reviewed and tested on a staging DB before production
+- Never run raw `DROP`, `DELETE`, or `TRUNCATE` in migration scripts without a rollback plan
+- Add indexes for every foreign key and every field used in a `WHERE` clause
+- Use `findUniqueOrThrow` instead of `findUnique` when the record must exist — fail loudly
+- DB connection pool: set explicit limits — default NestJS + Prisma can exhaust connections under load
+- Soft delete for orders and payments: add `deleted_at` column, never hard delete financial records
+
+---
+
+## 8. RUST-SPECIFIC RULES
+
+### Async & Tokio
+
+```rust
+// ❌ WRONG — blocking I/O inside async context stalls the executor
+async fn fetch_price() -> Result<Decimal> {
+    std::thread::sleep(Duration::from_secs(1)); // blocks entire thread
+    Ok(dec!(100.0))
+}
+
+// ✅ CORRECT — use tokio async primitives
+async fn fetch_price() -> Result<Decimal> {
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    Ok(dec!(100.0))
+}
+
+// ✅ CORRECT — CPU-heavy work goes to blocking thread pool
+async fn compute_heavy() -> Result<Vec<ProductPrice>> {
+    tokio::task::spawn_blocking(|| {
+        // expensive sync computation here
+    }).await?
+}
+```
+
+### Channel patterns for chain listeners
+
+```rust
+// ✅ CORRECT — each chain adapter owns its task, supervisor restarts on failure
+async fn run_chain_supervisor(
+    adapter: Arc<dyn ChainListener>,
+    event_tx: mpsc::Sender<PaymentEvent>,
+) {
+    loop {
+        let result = adapter.start(event_tx.clone()).await;
+        match result {
+            Ok(_) => tracing::warn!(chain = adapter.chain_id(), "Listener exited cleanly — restarting"),
+            Err(e) => tracing::error!(chain = adapter.chain_id(), error = %e, "Listener crashed — restarting"),
+        }
+        tokio::time::sleep(Duration::from_secs(5)).await; // backoff before restart
+    }
+}
+```
+
+### Rules
+- `#[tokio::main]` only in binary entry point — library code is runtime-agnostic
+- All Rust services expose `/health` (HTTP) and `/metrics` (Prometheus) on a separate port
+- Use `tracing` crate — never `println!` or `eprintln!` in production code
+- `Clone` only types that are cheap to clone — prefer `Arc<T>` for shared state
+- Sensitive data (private keys, secrets) implement `ZeroizeOnDrop`
+- Run `cargo clippy -- -D warnings` in CI — warnings are errors
+- Run `cargo audit` in CI — block on any known vulnerability in dependencies
+
+---
+
+## 9. NESTJS-SPECIFIC RULES
+
+### Dependency injection & module structure
+
+```
+src/
+  modules/
+    orders/
+      orders.module.ts
+      orders.service.ts
+      orders.controller.ts
+      orders.repository.ts   ← DB queries isolated here
+      dto/
+      events/
+    payments/
+    fulfillment/
+    chatbot/
+  common/
+    guards/
+    interceptors/
+    filters/
+    decorators/
+  config/
+  prisma/
+```
+
+### Global exception filter — catch everything
+
+```typescript
+@Catch()
+export class GlobalExceptionFilter implements ExceptionFilter {
+  catch(exception: unknown, host: ArgumentsHost) {
+    const ctx = host.switchToHttp();
+    const response = ctx.getResponse<Response>();
+    const request = ctx.getRequest<Request>();
+
+    const status = exception instanceof HttpException
+      ? exception.getStatus()
+      : HttpStatus.INTERNAL_SERVER_ERROR;
+
+    // Log with full context — never expose raw error to client
+    logger.error({
+      statusCode: status,
+      path: request.url,
+      method: request.method,
+      exception,
+    }, 'Unhandled exception');
+
+    response.status(status).json({
+      statusCode: status,
+      timestamp: new Date().toISOString(),
+      path: request.url,
+      // Never include stack trace or internal error message in response
+      message: status >= 500 ? 'Internal server error' : (exception as HttpException).message,
+    });
+  }
+}
+```
+
+### Rules
+- Every controller method has a DTO with `class-validator` decorators — validate at the boundary
+- Use `@UseGuards` on every non-public endpoint — never rely on "this is internal"
+- Interceptors for request logging — log `method`, `path`, `statusCode`, `durationMs`
+- Never return raw Prisma errors to clients — they leak schema information
+- Use `ConfigService` for all env var access — never `process.env` directly in services
+- Repository pattern — keep all DB queries in `*.repository.ts`, never in controllers or services directly
+
+---
+
+## 10. LOGGING
+
+### Structured logging — always JSON in production
+
+```typescript
+// ❌ WRONG
+console.log(`Order ${orderId} confirmed`);
+
+// ✅ CORRECT — structured, searchable
+logger.info({
+  event: 'order.payment_confirmed',
+  orderId,
+  method: 'naira',
+  amountKobo,
+  durationMs: Date.now() - startTime,
+}, 'Payment confirmed');
+```
+
+```rust
+// ✅ CORRECT — tracing with structured fields
+tracing::info!(
+    event = "payment.confirmed",
+    order_id = %order_id,
+    chain = %chain,
+    tx_hash = %tx_hash,
+    amount_usdc = %amount,
+    "Payment confirmed on-chain"
+);
+```
+
+### Fields to include on every log
+- `event` — machine-readable event name: `order.created`, `payment.confirmed`, `fraud.blocked`
+- `orderId` — always, if in context
+- `method` — `naira` | `solana` | `stellar` | chain name
+- `durationMs` — for any operation that involves I/O
+- `service` — which microservice emitted the log
+
+### Fields to NEVER log
+- Private keys, wallet seeds, mnemonics
+- Paystack secret key, webhook secret
+- Full PSN gift codes (log only masked: `XXXX-XXXX-XXXX-A3F2`)
+- Full bank account numbers (log only last 4 digits)
+- WhatsApp message body content (PII)
+- Full webhook payloads from payment providers
+
+---
+
+## 11. TESTING
+
+### Test pyramid — fintech requires higher coverage than typical
+
+```
+Unit tests:     business logic, pure functions, rule engine rules   → 90%+ coverage
+Integration:    DB queries, Redis ops, Paystack adapter, gRPC calls → happy + error paths
+E2E:            full payment flow (mock Paystack + mock chain)       → critical paths only
+```
+
+### Critical paths that MUST have tests
+- Every fraud detection rule in isolation
+- Payment state machine transitions — valid and invalid
+- Idempotency: duplicate webhook does not double-process
+- Paystack signature verification — valid and tampered
+- Amount mismatch detection
+- Exchange rate deviation alert trigger
+- Order expiry on TTL
+
+```typescript
+// ✅ Example — idempotency test
+it('should not process duplicate Paystack webhook', async () => {
+  const payload = buildPaystackWebhookPayload({ reference: 'ref_abc123' });
+
+  await paymentsService.handlePaystackWebhook(payload); // first call
+  await paymentsService.handlePaystackWebhook(payload); // duplicate
+
+  const payments = await db.payment.findMany({ where: { providerRef: 'ref_abc123' } });
+  expect(payments).toHaveLength(1); // only one record created
+});
+```
+
+```rust
+// ✅ Example — rule engine test
+#[tokio::test]
+async fn test_reference_reuse_blocks() {
+    let redis = MockRedis::new();
+    redis.set("seen_refs:ref_123", "1").await;
+
+    let event = mock_payment_event("ref_123");
+    let result = check_reference_reuse(&FraudContext { event: &event, redis: &redis }).await;
+
+    assert!(matches!(result, RuleResult::Block { .. }));
+}
+```
+
+### Rules
+- `decimal.js` / `rust_decimal` arithmetic tested with known edge cases
+- No `Date.now()` or `Math.random()` in business logic — inject as dependencies so tests control them
+- Test file mirrors source structure: `src/orders/orders.service.ts` → `test/orders/orders.service.spec.ts`
+- Rust: `cargo test` must pass with zero warnings before merge
+- Node.js: Jest with `--coverage` — fail CI if coverage drops below threshold
+
+---
+
+## 12. GRPC (RUST ↔ NODE.JS)
+
+```typescript
+// Node.js gRPC client — Pricing Engine
+import { PricingServiceClient } from '../generated/pricing_grpc_pb';
+import { credentials } from '@grpc/grpc-js';
+
+@Injectable()
+export class PricingClient {
+  private client: PricingServiceClient;
+
+  constructor(config: ConfigService) {
+    this.client = new PricingServiceClient(
+      config.get('PRICING_ENGINE_ADDR'), // e.g. pricing-engine:50051
+      credentials.createInsecure(), // mTLS in production
+    );
+  }
+
+  async getCurrentPrices(): Promise<ProductPrice[]> {
+    return promisify(this.client.getCurrentPrices.bind(this.client))({});
+  }
+}
+```
+
+### Rules
+- Proto files live in a shared `proto/` directory at repo root — single source of truth
+- Generate TypeScript types from proto at build time — never handwrite them
+- gRPC calls have explicit timeouts — never leave them unbounded
+- Circuit breaker on gRPC calls from Node.js to Rust services — if Pricing Engine is down, serve cached Redis price
+- Use mTLS between services in production — insecure credentials only in local dev
+
+---
+
+## 13. REDIS USAGE
+
+```typescript
+// Key naming convention — always namespaced
+const KEYS = {
+  idempotency: (provider: string, ref: string) => `idem:${provider}:${ref}`,
+  virtualAccount: (orderId: string) => `vaccount:${orderId}`,
+  session: (whatsappNumber: string) => `session:${whatsappNumber}`,
+  price: (sku: string) => `price:${sku}`,
+  velocity: (address: string, date: string) => `velocity:${address}:${date}`,
+  confirmedTx: (chain: string, txHash: string) => `confirmed_tx:${chain}:${txHash}`,
+} as const;
+```
+
+### Rules
+- Every Redis key has an explicit TTL — no permanent keys for ephemeral data
+- Key naming: `{namespace}:{identifier}` — never bare keys
+- Never store sensitive data (private keys, gift codes unencrypted) in Redis
+- Redis is cache and coordination layer — PostgreSQL is the system of record
+- If Redis is unavailable, payment flows degrade gracefully (not fail hard) — except idempotency gates
+
+---
+
+## 14. API DESIGN
+
+```typescript
+// ✅ CORRECT — consistent response envelope
+interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  error?: { code: string; message: string };
+  meta?: { timestamp: string; requestId: string };
+}
+
+// ✅ CORRECT — amounts always as strings
+interface OrderResponse {
+  id: string;
+  status: string;
+  amountNgn: string;     // "16000.00" — not 16000
+  amountUsdc: string;    // "10.000000" — not 10
+  createdAt: string;     // ISO 8601
+}
+```
+
+### Rules
+- All timestamps: ISO 8601 UTC strings — `2025-05-01T14:00:00.000Z`
+- All amounts: decimal strings — never JSON numbers for money
+- All IDs: UUIDs — never auto-increment integers exposed externally
+- Versioned routes: `/api/v1/` — always, from day one
+- Rate limiting per WhatsApp number on API Gateway — not just per IP
+- 4xx errors always include a machine-readable `code` field for client handling
+
+---
+
+## 15. DEPLOYMENT & ENVIRONMENT
+
+### Service ports (local dev)
+
+| Service | HTTP | gRPC | Metrics |
+|---|---|---|---|
+| API Gateway | 3000 | — | 9000 |
+| Orders Service | 3001 | — | 9001 |
+| Payment Settlement | 3002 | — | 9002 |
+| AI Chatbot | 3003 | — | 9003 |
+| Fulfillment | 3004 | — | 9004 |
+| Notification | 3005 | — | 9005 |
+| Pricing Engine (Rust) | — | 50051 | 9090 |
+| Fraud Detection (Rust) | — | 50052 | 9091 |
+| Chain Listener (Rust) | 4000 (webhook) | — | 9092 |
+
+### Health checks — every service
+
+```typescript
+// NestJS — required on every service
+@Get('/health')
+health(): { status: string; timestamp: string } {
+  return { status: 'ok', timestamp: new Date().toISOString() };
+}
+```
+
+```rust
+// Rust — axum health route on separate port
+async fn health() -> impl IntoResponse {
+    Json(json!({ "status": "ok", "timestamp": Utc::now().to_rfc3339() }))
+}
+```
+
+### Rules
+- Every service has `/health` — load balancer and k8s liveness probe target
+- Graceful shutdown: drain in-flight requests before exiting — never SIGKILL in production
+- Environment variables for all config — no config files with secrets in Docker images
+- Resource limits on every container: CPU and memory — prevent one service starving others
+- Separate ECS task definitions / k8s deployments per service — never colocate
+
+---
+
+## 16. WHAT CURSOR SHOULD NEVER DO
+
+- Never use `float` or `double` for any monetary amount
+- Never hardcode Paystack keys, wallet addresses, or RPC URLs
+- Never write a DB migration that drops a column without a multi-step deploy plan
+- Never add `console.log` with full webhook payloads
+- Never bypass the idempotency gate "just for testing"
+- Never use `Math.random()` for anything in payment flows
+- Never process a payment event without first validating the order exists and is in the correct state
+- Never return a 500 with a raw error message or stack trace to an external client
+- Never add a new chain adapter without implementing the full `ChainListener` trait
+- Never store a gift code in plain text — always `code_enc` via KMS
+- Never commit `.env` files, private keys, or seed phrases
+
+---
+
+## 17. CODE REVIEW CHECKLIST
+
+Before raising a PR on payment-critical code, verify:
+
+- [ ] No floating point arithmetic on monetary values
+- [ ] Idempotency key present for any operation triggered by an external event
+- [ ] State machine transition validated before DB write
+- [ ] Webhook signature verification in place
+- [ ] No secrets in code or logs
+- [ ] Error path tested — not just happy path
+- [ ] Structured log fields correct and complete
+- [ ] No raw Prisma errors returned to client
+- [ ] New Redis keys have explicit TTLs
+- [ ] gRPC calls have timeout set
+- [ ] New Rust code: `clippy` clean, no `unwrap()` in hot paths
