@@ -1,7 +1,7 @@
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
 export type OrderStatus = 'PENDING' | 'PAID' | 'FULFILLED' | 'EXPIRED' | 'FAILED';
-export type PaymentMode = 'WALLET' | 'DIRECT_TRANSFER';
+export type PaymentMode = 'WALLET' | 'DIRECT_TRANSFER' | 'CRYPTO';
 export type ProductCategory = 'GIFT_CARD' | 'GAME_TOP_UP' | 'AIRTIME';
 export type AdminRole = 'SUPER_ADMIN' | 'ADMIN';
 export type AuditAction =
@@ -66,17 +66,21 @@ export interface Stats {
   };
 }
 
-// ─── Transactions ──────────────────────────────────────────────────────────────
+// ─── Payments ─────────────────────────────────────────────────────────────────
 
-export type TransactionType = 'CREDIT' | 'DEBIT';
+export type PaymentMethod =
+  | 'DEDICATED_NUBAN'
+  | 'BANK_TRANSFER'
+  | 'WALLET'
+  | 'REFUND';
 
-export interface Transaction {
+export interface UserPayment {
   id: string;
-  type: TransactionType;
+  method: PaymentMethod;
   amount: number;
-  reference: string;
+  providerRef: string;
   orderId: string | null;
-  createdAt: string;
+  confirmedAt: string;
 }
 
 // ─── Users ────────────────────────────────────────────────────────────────────
@@ -86,7 +90,7 @@ export interface UserListItem {
   whatsappNumber: string;
   displayName: string | null;
   createdAt: string;
-  walletBalance: number;
+  orderCount: number;
 }
 
 export interface PinStatus {
@@ -96,6 +100,7 @@ export interface PinStatus {
 }
 
 export interface UserDetail extends UserListItem {
+  paymentCount: number;
   pinStatus: PinStatus;
   recentOrders: Order[];
   virtualAccount: {
@@ -141,9 +146,23 @@ export interface Order {
   user?: OrderUserRef;
 }
 
+export interface PaymentTimelineEntry {
+  id: string;
+  method: PaymentMethod;
+  amount: string;
+  providerRef: string;
+  confirmedAt: string;
+}
+
 export interface OrderDetail extends Order {
   voucherAssigned: boolean;
   voucherIsUsed: boolean;
+  rateSnapshot?: string | null;
+  paystackDvaReference?: string | null;
+  /** API field from GET /admin/orders/:id */
+  payments?: PaymentTimelineEntry[];
+  /** @deprecated Use `payments` */
+  paymentTimeline?: PaymentTimelineEntry[];
 }
 
 // ─── Products ─────────────────────────────────────────────────────────────────
@@ -216,10 +235,10 @@ export interface AdminDirectoryItem {
   role: AdminRole;
 }
 
+/** Returned by `/api/auth/login` — JWT is stored in HttpOnly cookie only. */
 export interface LoginResponse {
-  access_token: string;
   must_change_password: boolean;
-  role: AdminRole;
-  email: string;
-  display_name: string;
+  role?: AdminRole;
+  email?: string;
+  display_name?: string;
 }

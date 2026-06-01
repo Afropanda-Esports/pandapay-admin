@@ -14,6 +14,7 @@ import Link from 'next/link';
 import { use } from 'react';
 import { toast } from 'sonner';
 
+import { PaymentTimeline } from '@/components/orders/payment-timeline';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { PageHeader } from '@/components/shared/page-header';
 import { StatusBadge } from '@/components/shared/status-badge';
@@ -27,12 +28,14 @@ import {
 } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ApiError } from '@/lib/api/client';
+import { usePermissions } from '@/hooks/use-permissions';
 import { getOrder, resendOrder, fulfillOrder } from '@/lib/api/orders';
 import type { OrderDetail, PaymentMode } from '@/lib/types';
 
 const PAYMENT_MODE_LABEL: Record<PaymentMode, string> = {
   WALLET: 'Wallet',
-  DIRECT_TRANSFER: 'Direct transfer',
+  DIRECT_TRANSFER: 'Bank transfer',
+  CRYPTO: 'USDC (crypto)',
 };
 
 const formatAmount = (raw: string) => {
@@ -138,6 +141,17 @@ function PaymentInfo({ order }: Readonly<{ order: OrderDetail }>) {
           }
         />
       )}
+      {order.paystackDvaReference && (
+        <DetailRow
+          label="DVA account"
+          value={
+            <span className="font-mono text-xs">{order.paystackDvaReference}</span>
+          }
+        />
+      )}
+      {order.rateSnapshot && (
+        <DetailRow label="Rate snapshot" value={order.rateSnapshot} />
+      )}
       <DetailRow
         label="Voucher assigned"
         value={order.voucherAssigned ? 'Yes' : 'No'}
@@ -145,6 +159,16 @@ function PaymentInfo({ order }: Readonly<{ order: OrderDetail }>) {
       <DetailRow
         label="Voucher used"
         value={order.voucherIsUsed ? 'Yes' : 'No'}
+      />
+    </InfoCard>
+  );
+}
+
+function PaymentTimelineCard({ order }: Readonly<{ order: OrderDetail }>) {
+  return (
+    <InfoCard title="Payment timeline">
+      <PaymentTimeline
+        entries={order.payments ?? order.paymentTimeline ?? []}
       />
     </InfoCard>
   );
@@ -223,6 +247,7 @@ export default function OrderDetailPage({
 }: Readonly<{ params: Promise<{ id: string }> }>) {
   const { id } = use(params);
   const queryClient = useQueryClient();
+  const { can } = usePermissions();
 
   const { data: order, isLoading, isError, refetch } = useQuery({
     queryKey: ['order', id],
@@ -289,8 +314,8 @@ export default function OrderDetailPage({
   }
 
   const isInconsistent = order.voucherAssigned && !order.voucherIsUsed;
-  const canResend = order.status === 'FULFILLED';
-  const canFulfill = order.status === 'PAID';
+  const canResend = order.status === 'FULFILLED' && can('orders:manage');
+  const canFulfill = order.status === 'PAID' && can('orders:manage');
 
   const actions = (
     <div className="flex items-center gap-2">
@@ -345,6 +370,7 @@ export default function OrderDetailPage({
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <OrderInfo order={order} />
         <PaymentInfo order={order} />
+        <PaymentTimelineCard order={order} />
         <UserInfo order={order} />
         <VoucherInfo order={order} />
       </div>

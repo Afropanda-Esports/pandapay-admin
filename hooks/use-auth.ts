@@ -1,29 +1,22 @@
 'use client';
 
-import Cookies from 'js-cookie';
+import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 
-const TOKEN_KEY = 'admin_token';
+import { logout as logoutApi } from '@/lib/api/auth';
 
 export function useAuth() {
   const router = useRouter();
+  const queryClient = useQueryClient();
 
-  const getToken = (): string | null => Cookies.get(TOKEN_KEY) ?? null;
-
-  const saveToken = (token: string) => {
-    Cookies.set(TOKEN_KEY, token, {
-      expires: 1,
-      sameSite: 'strict',
-      secure: process.env.NODE_ENV === 'production',
-    });
+  const logout = async () => {
+    try {
+      await logoutApi();
+    } finally {
+      queryClient.clear();
+      router.push('/login');
+    }
   };
 
-  const logout = () => {
-    Cookies.remove(TOKEN_KEY);
-    router.push('/login');
-  };
-
-  const isLoggedIn = () => !!getToken();
-
-  return { getToken, saveToken, logout, isLoggedIn };
+  return { logout };
 }

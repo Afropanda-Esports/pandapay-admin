@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import { Logo } from '@/components/shared/logo';
 import { cn } from '@/lib/utils';
 import { NAV_ITEMS } from '@/components/layout/nav-items';
-import { useMe } from '@/hooks/use-me';
+import { usePermissions } from '@/hooks/use-permissions';
 
 interface SidebarProps {
   className?: string;
@@ -15,11 +15,9 @@ interface SidebarProps {
 
 export function Sidebar({ className, onNavigate }: Readonly<SidebarProps>) {
   const pathname = usePathname();
-  const { data: me } = useMe();
+  const { can } = usePermissions();
 
-  const visibleItems = NAV_ITEMS.filter(
-    (item) => !item.requiresRole || item.requiresRole === me?.role,
-  );
+  const visibleItems = NAV_ITEMS.filter((item) => can(item.permission));
 
   return (
     <aside

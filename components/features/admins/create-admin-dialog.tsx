@@ -37,7 +37,7 @@ import { createAdmin } from '@/lib/api/admins';
 import type { AdminRole } from '@/lib/types';
 
 const ROLE_OPTIONS: { value: AdminRole; label: string }[] = [
-  { value: 'ADMIN', label: 'Admin' },
+  { value: 'ADMIN', label: 'Manager' },
   { value: 'SUPER_ADMIN', label: 'Super Admin' },
 ];
 

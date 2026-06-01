@@ -10,7 +10,7 @@ How this app connects to [pandapay-be](../../pandapay-be/). The **canonical** co
 
 Auth: JWT from `POST /admin/auth/login` stored in cookie `admin_token`. All admin calls use `Authorization: Bearer <token>` via `lib/api/client.ts`.
 
-Backend must allow CORS from `http://localhost:3001` with credentials (`ADMIN_FRONTEND_URL` in pandapay-be).
+Backend must allow CORS from the admin origin with credentials (`CORS_ORIGINS` or `ADMIN_FRONTEND_URL` in pandapay-be).
 
 ## Page ↔ API matrix
 
@@ -19,40 +19,37 @@ Backend must allow CORS from `http://localhost:3001` with credentials (`ADMIN_FR
 | Page | `lib/api` | Backend routes |
 |------|-----------|------------------|
 | Login | `auth.ts` | `POST /admin/auth/login` |
-| Shell / profile | `me.ts` | `GET /admin/me` |
+| Shell / profile | `me.ts` | `GET /admin/me`, `POST /admin/me/change-password` |
 | Dashboard | `stats.ts` | `GET /admin/stats` |
-| Orders list/detail | `orders.ts` | `GET /admin/orders`, `GET /admin/orders/:id`, `POST .../resend`, `POST .../fulfill` |
-| Users list/detail | `users.ts` | `GET /admin/users`, `GET /admin/users/:id`, `PATCH .../unlock-pin` |
-| Products list/detail | `products.ts` | `GET/POST/PATCH /admin/products`, voucher upload/stats |
+| Orders list/detail | `orders.ts` | `GET /admin/orders`, `GET /admin/orders/:id` (includes `payments` + `paymentTimeline` alias), `POST .../resend`, `POST .../fulfill` |
+| Users list/detail | `users.ts` | `GET /admin/users`, `GET /admin/users/:id`, `GET .../payments`, `PATCH .../unlock-pin` |
+| Products list/detail | `products.ts` | `GET/POST/PATCH /admin/products`, `PATCH .../pricing`, voucher upload/stats |
+| Pricing | `pricing.ts` | `GET/PATCH /admin/pricing/*`, oracle rate, recompute |
+| Admins | `admins.ts` | `GET/POST/PATCH /admin/admins/*` |
 | Audit | `audit.ts` | `GET /admin/audit-logs` |
 
-### UI built, backend missing (expect 404 / network errors)
+### Storefront (panda-pay, not admin)
 
-| Page | `lib/api` | Missing routes |
-|------|-----------|------------------|
-| Change password | `me.ts` | `POST /admin/me/change-password` |
-| User detail (wallet) | `users.ts` | `GET /admin/users/:id/transactions`, `POST /admin/users/:id/wallet/credit` |
-| Product pricing card | `products.ts` | `PATCH /admin/products/:id/pricing` |
-| Pricing | `pricing.ts` | All `/admin/pricing/*` |
-| Admins | `admins.ts` | All `/admin/admins/*` |
+| Consumer | Backend route |
+|----------|-----------------|
+| Marketing site inventory | `GET /offerings` |
+| Spec catalog API | `GET /api/v1/catalog` |
 
-**Product decision (open):** hide Pricing / Admins / change-password until BE ships, or implement the missing admin module on pandapay-be. See [STANDARDS_AUDIT.md](../../pandapay-be/STANDARDS_AUDIT.md).
+## Response notes
 
-## Type / response mismatches
-
-Until a pricing module exists on the backend:
-
-- Use **`denomination`** (string decimal from TypeORM) for NGN price — not `snapshotNgnPrice`, `priceUsd`, or `pricingMode` on product payloads.
-- Order **`amount`** is a string in JSON; parse with `parseFloat` for display.
-- Login returns `display_name`, `role: SUPER_ADMIN`, `must_change_password: false` — see BE doc for the full shape.
+- Product payloads include **`snapshotNgnPrice`**, `priceUsd`, `pricingMode`, and optional **`sku`**.
+- Order **`amount`** is a string in JSON; parse for display.
+- Order detail includes **`payments`** (and **`paymentTimeline`** alias) — array of `{ id, method, amount, providerRef, confirmedAt }` from the immutable `payments` table.
+- Login returns `display_name`, `role`, `must_change_password` — see BE doc for the full shape.
 
 ## Local dev checklist
 
-1. PostgreSQL + migrations: `cd pandapay-be && pnpm run migration:run && pnpm run start:dev`
+1. Start stack: `docker compose up -d` from repo root (Postgres + Redis + backend), or `cd pandapay-be && pnpm migration:run && pnpm start:dev` with `REDIS_URL` set.
 2. Admin env: `cd pandapay-admin && cp .env.example .env.local && pnpm dev`
 3. Log in with `ADMIN_EMAIL` / `ADMIN_PASSWORD` from pandapay-be `.env`
 4. Swagger (non-prod): `http://localhost:3000/api/docs`
 
 ## Changelog
 
+- **2026-05-30:** Phase A refresh — pricing, admins, change-password, wallet credit, and payment timeline are wired; storefront `/offerings` documented.
 - **2026-05-19:** Initial admin doc; aligned with BE Track A (`/admin/me`, login shape, order fulfill).

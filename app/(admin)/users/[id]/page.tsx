@@ -8,32 +8,14 @@ import {
   ArrowLeftRight,
   RefreshCw,
   User as UserIcon,
-  Wallet,
-  Plus,
 } from 'lucide-react';
 import Link from 'next/link';
 import { use, useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
-
-import { useMe } from '@/hooks/use-me';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-
 import { PinStatusCard } from '@/components/features/users/pin-status-card';
 import { EmptyState } from '@/components/shared/empty-state';
 import { PageHeader } from '@/components/shared/page-header';
 import { StatusBadge } from '@/components/shared/status-badge';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -47,12 +29,13 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { getUser, getTransactions, creditWallet } from '@/lib/api/users';
+import { getUser, getUserPayments } from '@/lib/api/users';
 import type { Order, PaymentMode, UserDetail } from '@/lib/types';
 
 const PAYMENT_MODE_LABEL: Record<PaymentMode, string> = {
   WALLET: 'Wallet',
-  DIRECT_TRANSFER: 'Transfer',
+  DIRECT_TRANSFER: 'Bank transfer',
+  CRYPTO: 'USDC (crypto)',
 };
 
 const formatAmount = (raw: string) => {
@@ -60,9 +43,6 @@ const formatAmount = (raw: string) => {
   if (!Number.isFinite(n)) return raw;
   return `₦${n.toLocaleString('en-NG', { maximumFractionDigits: 2 })}`;
 };
-
-const formatBalance = (n: number) =>
-  `₦${n.toLocaleString('en-NG', { maximumFractionDigits: 2 })}`;
 
 function DetailRow({
   label,
@@ -88,12 +68,19 @@ function ProfileCard({ user }: Readonly<{ user: UserDetail }>) {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="mb-6 flex items-center justify-between">
-          <div className="flex items-center gap-1.5 tabular-nums text-2xl font-bold">
-            <Wallet className="size-6 text-muted-foreground" />
-            {formatBalance(user.walletBalance)}
+        <div className="mb-6 grid grid-cols-2 gap-4">
+          <div>
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+              Orders
+            </p>
+            <p className="text-2xl font-bold tabular-nums">{user.orderCount}</p>
           </div>
-          <CreditWalletDialog userId={user.id} />
+          <div>
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+              Payments
+            </p>
+            <p className="text-2xl font-bold tabular-nums">{user.paymentCount}</p>
+          </div>
         </div>
         <DetailRow
           label="User ID"
@@ -113,13 +100,13 @@ function ProfileCard({ user }: Readonly<{ user: UserDetail }>) {
         />
         {user.virtualAccount ? (
           <DetailRow
-            label="Funding Account"
+            label="Bank account (orders)"
             value={`${user.virtualAccount.accountNumber} (${user.virtualAccount.bankName})`}
           />
         ) : (
           <DetailRow
-            label="Funding Account"
-            value={<span className="text-muted-foreground">Not set up</span>}
+            label="Bank account (orders)"
+            value={<span className="text-muted-foreground">Created on first order</span>}
           />
         )}
       </CardContent>
@@ -127,88 +114,18 @@ function ProfileCard({ user }: Readonly<{ user: UserDetail }>) {
   );
 }
 
-function CreditWalletDialog({ userId }: Readonly<{ userId: string }>) {
-  const { data: me } = useMe();
-  const queryClient = useQueryClient();
-  const [open, setOpen] = useState(false);
-  const [amount, setAmount] = useState('');
-  const [note, setNote] = useState('');
-
-  const mutation = useMutation({
-    mutationFn: () => creditWallet(userId, { amount: Number(amount), note }),
-    onSuccess: () => {
-      toast.success(`Wallet credited · ${formatAmount(amount)}`);
-      setOpen(false);
-      setAmount('');
-      setNote('');
-      queryClient.invalidateQueries({ queryKey: ['user', userId] });
-      queryClient.invalidateQueries({ queryKey: ['user-transactions', userId] });
-    },
-    onError: (error) => {
-      toast.error('Failed to credit wallet', {
-        description: error instanceof Error ? error.message : 'Unknown error',
-      });
-    },
-  });
-
-  if (me?.role !== 'SUPER_ADMIN') return null;
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger
-        render={
-          <Button size="sm" variant="secondary">
-            <Plus className="mr-2 size-4" />
-            Credit wallet
-          </Button>
-        }
-      />
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Credit Wallet</DialogTitle>
-          <DialogDescription>
-            Manually add funds to this user&apos;s wallet. This action will be audited.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid gap-2">
-            <Label htmlFor="amount">Amount (₦)</Label>
-            <Input
-              id="amount"
-              type="number"
-              placeholder="0.00"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="note">Note (Internal)</Label>
-            <Input
-              id="note"
-              placeholder="e.g. Refund for failed order"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-            />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>
-            Cancel
-          </Button>
-          <Button
-            onClick={() => mutation.mutate()}
-            disabled={!amount || Number(amount) <= 0 || mutation.isPending}
-          >
-            {mutation.isPending ? 'Processing...' : 'Confirm'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
+const PAYMENT_METHOD_LABEL: Record<
+  import('@/lib/types').PaymentMethod,
+  string
+> = {
+  DEDICATED_NUBAN: 'Bank transfer',
+  BANK_TRANSFER: 'Bank transfer',
+  WALLET: 'Wallet',
+  REFUND: 'Refund',
+};
 
 function PaymentModeBadge({ mode }: Readonly<{ mode: PaymentMode }>) {
-  const Icon = mode === 'WALLET' ? Wallet : ArrowLeftRight;
+  const Icon = ArrowLeftRight;
   return (
     <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
       <Icon className="size-3.5" />
@@ -308,17 +225,17 @@ function RecentOrdersCard({ orders }: Readonly<{ orders: Order[] }>) {
   );
 }
 
-function WalletLedgerCard({ userId }: Readonly<{ userId: string }>) {
+function PaymentHistoryCard({ userId }: Readonly<{ userId: string }>) {
   const [page, setPage] = useState(1);
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['user-transactions', userId, page],
-    queryFn: () => getTransactions(userId, page),
+    queryKey: ['user-payments', userId, page],
+    queryFn: () => getUserPayments(userId, page),
   });
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm">Wallet Ledger</CardTitle>
+        <CardTitle className="text-sm">Payment history</CardTitle>
       </CardHeader>
       <CardContent>
         {isLoading ? (
@@ -328,11 +245,11 @@ function WalletLedgerCard({ userId }: Readonly<{ userId: string }>) {
             <Skeleton className="h-8 w-full" />
           </div>
         ) : isError ? (
-          <div className="text-sm text-destructive">Failed to load transactions</div>
+          <div className="text-sm text-destructive">Failed to load payments</div>
         ) : !data || data.data.length === 0 ? (
           <EmptyState
-            title="No transactions"
-            message="This wallet has no ledger history."
+            title="No payments"
+            message="Bank transfers and refunds for this user will appear here."
             className="py-10"
           />
         ) : (
@@ -342,43 +259,48 @@ function WalletLedgerCard({ userId }: Readonly<{ userId: string }>) {
                 <thead className="text-left text-xs uppercase tracking-wide text-muted-foreground">
                   <tr>
                     <th className="px-2 py-2 font-medium">Date</th>
-                    <th className="px-2 py-2 font-medium">Type</th>
+                    <th className="px-2 py-2 font-medium">Method</th>
                     <th className="px-2 py-2 font-medium">Amount</th>
                     <th className="px-2 py-2 font-medium">Reference</th>
                     <th className="px-2 py-2 font-medium">Order</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {data.data.map((tx) => (
+                  {data.data.map((payment) => (
                     <tr
-                      key={tx.id}
+                      key={payment.id}
                       className="border-t border-border/60 align-middle"
                     >
                       <td className="px-2 py-2 text-xs text-muted-foreground">
-                        {format(parseISO(tx.createdAt), 'PPpp')}
+                        {format(parseISO(payment.confirmedAt), 'PPpp')}
                       </td>
                       <td className="px-2 py-2">
-                        <Badge variant={tx.type === 'CREDIT' ? 'default' : 'secondary'} className="text-[10px]">
-                          {tx.type}
+                        <Badge
+                          variant={
+                            payment.method === 'REFUND' ? 'secondary' : 'default'
+                          }
+                          className="text-[10px]"
+                        >
+                          {PAYMENT_METHOD_LABEL[payment.method]}
                         </Badge>
                       </td>
                       <td className="px-2 py-2 tabular-nums">
-                        {formatAmount(tx.amount.toString())}
+                        {formatAmount(payment.amount.toString())}
                       </td>
                       <td className="px-2 py-2 font-mono text-xs text-muted-foreground">
-                        {tx.reference}
+                        {payment.providerRef}
                       </td>
                       <td className="px-2 py-2">
-                        {tx.orderId ? (
+                        {payment.orderId ? (
                           <Button
                             variant="link"
                             className="h-auto p-0 font-mono text-xs"
-                            render={<Link href={`/orders/${tx.orderId}`} />}
+                            render={<Link href={`/orders/${payment.orderId}`} />}
                           >
-                            {tx.orderId.slice(0, 8)}…
+                            {payment.orderId.slice(0, 8)}…
                           </Button>
                         ) : (
-                          '—'
+                          <span className="text-xs text-muted-foreground">Unmatched</span>
                         )}
                       </td>
                     </tr>
@@ -386,7 +308,7 @@ function WalletLedgerCard({ userId }: Readonly<{ userId: string }>) {
                 </tbody>
               </table>
             </div>
-            
+
             {data.total > data.limit && (
               <div className="flex items-center justify-between border-t border-border/60 pt-4 text-sm text-muted-foreground">
                 <p>
@@ -398,7 +320,7 @@ function WalletLedgerCard({ userId }: Readonly<{ userId: string }>) {
                     variant="outline"
                     size="sm"
                     disabled={page === 1}
-                    onClick={() => setPage(p => p - 1)}
+                    onClick={() => setPage((p) => p - 1)}
                   >
                     Previous
                   </Button>
@@ -406,7 +328,7 @@ function WalletLedgerCard({ userId }: Readonly<{ userId: string }>) {
                     variant="outline"
                     size="sm"
                     disabled={page * data.limit >= data.total}
-                    onClick={() => setPage(p => p + 1)}
+                    onClick={() => setPage((p) => p + 1)}
                   >
                     Next
                   </Button>
@@ -511,7 +433,7 @@ export default function UserDetailPage({
 
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <RecentOrdersCard orders={user.recentOrders} />
-        <WalletLedgerCard userId={user.id} />
+        <PaymentHistoryCard userId={user.id} />
       </div>
     </div>
   );

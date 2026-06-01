@@ -30,9 +30,6 @@ const userListParsers = {
   page: parseAsInteger.withDefault(1),
 };
 
-const formatBalance = (n: number) =>
-  `₦${n.toLocaleString('en-NG', { maximumFractionDigits: 2 })}`;
-
 function TruncatedId({ id }: Readonly<{ id: string }>) {
   return (
     <Tooltip>
@@ -57,7 +54,7 @@ function UsersTable({ users }: Readonly<{ users: UserListItem[] }>) {
             <th className="px-3 py-2 font-medium">User</th>
             <th className="px-3 py-2 font-medium">Display Name</th>
             <th className="px-3 py-2 font-medium">WhatsApp</th>
-            <th className="px-3 py-2 font-medium text-right">Balance</th>
+            <th className="px-3 py-2 font-medium text-right">Orders</th>
             <th className="px-3 py-2 font-medium">Joined</th>
             <th className="px-3 py-2 font-medium text-right">Actions</th>
           </tr>
@@ -80,7 +77,7 @@ function UsersTable({ users }: Readonly<{ users: UserListItem[] }>) {
                 <span className="font-mono text-xs">{user.whatsappNumber}</span>
               </td>
               <td className="px-3 py-2 text-right tabular-nums">
-                {formatBalance(user.walletBalance)}
+                {user.orderCount}
               </td>
               <td className="px-3 py-2 text-xs text-muted-foreground">
                 {format(parseISO(user.createdAt), 'dd MMM yyyy')}

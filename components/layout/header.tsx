@@ -7,6 +7,7 @@ import { KeyRound, LogOut, Menu, ShieldCheck } from 'lucide-react';
 
 import { useAuth } from '@/hooks/use-auth';
 import { useMe } from '@/hooks/use-me';
+import { usePermissions } from '@/hooks/use-permissions';
 import { NAV_ITEMS } from '@/components/layout/nav-items';
 import { Sidebar } from '@/components/layout/sidebar';
 import { ThemeToggle } from '@/components/layout/theme-toggle';
@@ -49,6 +50,7 @@ export function Header() {
   const pathname = usePathname();
   const { logout } = useAuth();
   const { data: me } = useMe();
+  const { roleLabel, isSuperAdmin } = usePermissions();
   const [mobileOpen, setMobileOpen] = useState(false);
   const title = deriveTitle(pathname);
 
@@ -94,12 +96,20 @@ export function Header() {
                   <span className="text-sm font-medium">
                     {me?.displayName ?? 'Admin'}
                   </span>
-                  {me?.role === 'SUPER_ADMIN' && (
-                    <Badge className="bg-info-100 text-info-700 hover:bg-info-100 border-0 text-[10px] px-1.5 py-0">
-                      <ShieldCheck className="size-3" />
-                      Super
+                  {me?.role ? (
+                    <Badge
+                      className={
+                        isSuperAdmin
+                          ? 'bg-info-100 text-info-700 hover:bg-info-100 border-0 text-[10px] px-1.5 py-0'
+                          : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-100 border-0 text-[10px] px-1.5 py-0'
+                      }
+                    >
+                      {isSuperAdmin ? (
+                        <ShieldCheck className="size-3" />
+                      ) : null}
+                      {roleLabel}
                     </Badge>
-                  )}
+                  ) : null}
                 </div>
                 <div className="text-xs font-normal text-muted-foreground break-all">
                   {me?.email ?? '—'}

@@ -65,7 +65,7 @@ function RoleBadge({ role }: Readonly<{ role: AdminUser['role'] }>) {
   }
   return (
     <Badge className="bg-neutral-100 text-neutral-500 hover:bg-neutral-100 border-0">
-      Admin
+      Manager
     </Badge>
   );
 }
@@ -411,8 +411,8 @@ function ForbiddenState() {
   return (
     <div>
       <PageHeader
-        title="Admins"
-        description="Manage who has access to the admin panel."
+        title="Team"
+        description="Super Admins manage operators (Managers and other Super Admins)."
       />
       <EmptyState
         title="Super admin access required"
@@ -451,8 +451,8 @@ export default function AdminsPage() {
   return (
     <div>
       <PageHeader
-        title="Admins"
-        description="Manage who has access to the admin panel."
+        title="Team"
+        description="Super Admins manage operators (Managers and other Super Admins)."
         actions={<CreateAdminDialog />}
       />
 

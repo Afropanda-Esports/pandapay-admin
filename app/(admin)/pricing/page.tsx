@@ -23,7 +23,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { useMe } from '@/hooks/use-me';
+import { usePermissions } from '@/hooks/use-permissions';
 import { getAdminDirectory } from '@/lib/api/admins';
 import { ApiError } from '@/lib/api/client';
 import {
@@ -236,8 +236,8 @@ function HistorySkeleton() {
 }
 
 export default function PricingPage() {
-  const { data: me } = useMe();
-  const isSuperAdmin = me?.role === 'SUPER_ADMIN';
+  const { can } = usePermissions();
+  const canManagePricing = can('pricing:manage');
 
   const {
     data: rate,
@@ -282,7 +282,7 @@ export default function PricingPage() {
       <PageHeader
         title="Pricing"
         description="Global NGN/USD rate and per-product pricing controls."
-        actions={isSuperAdmin ? <RecomputeButton /> : undefined}
+        actions={canManagePricing ? <RecomputeButton /> : undefined}
       />
 
       {rateError ? (
@@ -306,7 +306,7 @@ export default function PricingPage() {
             />
           )}
 
-          {isSuperAdmin && (
+          {canManagePricing && (
             <SetRateForm 
               currentMarkup={rate?.markupBps ?? 500}
               oracleRate={oracle?.oracleRate ?? null}

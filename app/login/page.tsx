@@ -9,7 +9,6 @@ import { z } from 'zod';
 import { toast } from 'sonner';
 
 import { login } from '@/lib/api/auth';
-import { useAuth } from '@/hooks/use-auth';
 import { ApiError } from '@/lib/api/client';
 import { Logo } from '@/components/shared/logo';
 import { Button } from '@/components/ui/button';
@@ -33,7 +32,6 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
-  const { saveToken } = useAuth();
   const [submitting, setSubmitting] = useState(false);
 
   const form = useForm<FormValues>({
@@ -45,8 +43,6 @@ function LoginForm() {
     setSubmitting(true);
     try {
       const res = await login(data.email, data.password);
-      saveToken(res.access_token);
-      // Invalidate any stale /me cache from a previous session.
       queryClient.removeQueries({ queryKey: ['me'] });
 
       if (res.must_change_password) {

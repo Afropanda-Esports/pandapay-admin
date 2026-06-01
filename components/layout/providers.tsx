@@ -32,7 +32,9 @@ export function Providers({ children }: Readonly<{ children: React.ReactNode }>)
       <NuqsAdapter>
         <QueryClientProvider client={queryClient}>
           <TooltipProvider delay={150}>{children}</TooltipProvider>
-          <ReactQueryDevtools initialIsOpen={false} />
+          {process.env.NODE_ENV === 'development' ? (
+            <ReactQueryDevtools initialIsOpen={false} />
+          ) : null}
         </QueryClientProvider>
       </NuqsAdapter>
     </ThemeProvider>

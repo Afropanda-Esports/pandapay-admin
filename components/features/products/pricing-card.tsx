@@ -22,6 +22,7 @@ import {
   FieldLabel,
 } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { usePermissions } from '@/hooks/use-permissions';
 import { cn } from '@/lib/utils';
 import type { PricingMode, ProductWithStats } from '@/lib/types';
 
@@ -44,6 +45,8 @@ function formatPriceNgn(value: string): string {
 
 export function PricingCard({ product }: Readonly<PricingCardProps>) {
   const queryClient = useQueryClient();
+  const { can } = usePermissions();
+  const canEditPricing = can('products:pricing');
 
   // Local form state — initialised from the product, kept in sync if it reloads.
   const [mode, setMode] = useState<PricingMode>(product.pricingMode);
@@ -126,6 +129,12 @@ export function PricingCard({ product }: Readonly<PricingCardProps>) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {!canEditPricing ? (
+          <p className="text-sm text-muted-foreground">
+            Pricing mode changes require Super Admin. Managers can upload vouchers
+            and toggle availability.
+          </p>
+        ) : null}
         <div className="flex items-baseline justify-between border-b border-border/60 pb-3">
           <span className="text-xs uppercase tracking-wide text-muted-foreground">
             Current price
@@ -144,16 +153,18 @@ export function PricingCard({ product }: Readonly<PricingCardProps>) {
               icon={Globe}
               label="Global FX"
               selected={mode === 'GLOBAL_FX'}
-              onClick={() => {
-                setMode('GLOBAL_FX');
-                setError(null);
-              }}
+            onClick={() => {
+              if (!canEditPricing) return;
+              setMode('GLOBAL_FX');
+              setError(null);
+            }}
             />
             <ModeOption
               icon={Wallet}
               label="Manual NGN"
               selected={mode === 'MANUAL_NGN'}
               onClick={() => {
+                if (!canEditPricing) return;
                 setMode('MANUAL_NGN');
                 setError(null);
               }}
@@ -184,7 +195,7 @@ export function PricingCard({ product }: Readonly<PricingCardProps>) {
                     setPriceUsd(e.target.value);
                     setError(null);
                   }}
-                  disabled={mutation.isPending}
+                  disabled={mutation.isPending || !canEditPricing}
                   className="pl-7"
                 />
               </div>
@@ -213,7 +224,7 @@ export function PricingCard({ product }: Readonly<PricingCardProps>) {
                     setManualPriceNgn(e.target.value);
                     setError(null);
                   }}
-                  disabled={mutation.isPending}
+                  disabled={mutation.isPending || !canEditPricing}
                   className="pl-7"
                 />
               </div>
@@ -237,13 +248,15 @@ export function PricingCard({ product }: Readonly<PricingCardProps>) {
                 </>
               )}
             </div>
-            <Button
-              type="button"
-              onClick={() => mutation.mutate()}
-              disabled={mutation.isPending || !isDirty || previewNgn === null}
-            >
-              {mutation.isPending ? 'Saving…' : 'Save pricing'}
-            </Button>
+            {canEditPricing ? (
+              <Button
+                type="button"
+                onClick={() => mutation.mutate()}
+                disabled={mutation.isPending || !isDirty || previewNgn === null}
+              >
+                {mutation.isPending ? 'Saving…' : 'Save pricing'}
+              </Button>
+            ) : null}
           </div>
         </FieldGroup>
       </CardContent>

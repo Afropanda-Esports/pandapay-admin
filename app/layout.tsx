@@ -5,6 +5,7 @@ import { Toaster } from '@/components/ui/sonner';
 
 export const metadata: Metadata = {
   title: 'PandaPay Admin',
+  robots: { index: false, follow: false },
 };
 
 export default function RootLayout({
