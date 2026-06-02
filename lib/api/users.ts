@@ -1,5 +1,5 @@
 import { apiFetch } from './client';
-import type { PaginatedResponse, UserListItem, UserDetail } from '@/lib/types';
+import type { PaginatedResponse, UserListItem, UserDetail, UserPayment } from '@/lib/types';
 
 interface GetUsersParams {
   page?: number;
@@ -25,13 +25,7 @@ export const unlockPin = (id: string) =>
     method: 'PATCH',
   });
 
-export const getTransactions = (id: string, page = 1, limit = 20) => {
+export const getUserPayments = (id: string, page = 1, limit = 20) => {
   const q = new URLSearchParams({ page: String(page), limit: String(limit) });
-  return apiFetch<PaginatedResponse<import('@/lib/types').Transaction>>(`/admin/users/${id}/transactions?${q}`);
+  return apiFetch<PaginatedResponse<UserPayment>>(`/admin/users/${id}/payments?${q}`);
 };
-
-export const creditWallet = (id: string, data: { amount: number; note: string }) =>
-  apiFetch<{ success: boolean; reference: string }>(`/admin/users/${id}/wallet/credit`, {
-    method: 'POST',
-    body: JSON.stringify(data),
-  });
