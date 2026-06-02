@@ -41,6 +41,20 @@ export const fulfillOrder = (id: string) =>
     method: 'POST',
   });
 
+export const refundOrder = (
+  id: string,
+  body?: { refundChannel?: string; externalReference?: string; note?: string },
+) =>
+  apiFetch<{ success: boolean; reference: string }>(`/admin/orders/${id}/refund`, {
+    method: 'POST',
+    body: JSON.stringify(body ?? {}),
+  });
+
+export const retryOrder = (id: string) =>
+  apiFetch<{ success: boolean; orderId: string }>(`/admin/orders/${id}/retry`, {
+    method: 'POST',
+  });
+
 export const createPurchase = (body: {
   userId: string;
   productId: string;
