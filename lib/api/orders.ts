@@ -4,6 +4,7 @@ import type {
   Order,
   OrderDetail,
   OrderStatus,
+  PaymentMode,
 } from '@/lib/types';
 
 interface GetOrdersParams {
@@ -38,4 +39,16 @@ export const resendOrder = (id: string) =>
 export const fulfillOrder = (id: string) =>
   apiFetch<{ success: boolean }>(`/admin/orders/${id}/fulfill`, {
     method: 'POST',
+  });
+
+export const createPurchase = (body: {
+  userId: string;
+  productId: string;
+  paymentMode?: PaymentMode;
+  markPaid?: boolean;
+  autoFulfill?: boolean;
+}) =>
+  apiFetch<{ orderId: string }>('/admin/orders/purchase', {
+    method: 'POST',
+    body: JSON.stringify(body),
   });

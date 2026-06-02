@@ -9,10 +9,13 @@ export type AuditAction =
   | 'WALLET_DEBIT'
   | 'ORDER_FULFILLED'
   | 'ORDER_FAILED'
+  | 'ORDER_REFUNDED'
+  | 'UNMATCHED_PAYMENT'
   | 'ORDER_EXPIRED'
   | 'ADMIN_RESEND'
   | 'ADMIN_WALLET_CREDIT'
   | 'ADMIN_FORCE_FULFILL'
+  | 'ADMIN_PURCHASE_CREATED'
   | 'USER_CREATED'
   | 'PIN_SET'
   | 'PIN_LOCKED'
@@ -29,7 +32,9 @@ export type AuditAction =
   | 'PRODUCT_AVAILABILITY_CHANGED'
   | 'VOUCHERS_UPLOADED'
   | 'FX_RATE_UPDATED'
-  | 'PRODUCTS_RECOMPUTED';
+  | 'PRODUCTS_RECOMPUTED'
+  | 'FRAUD_REVIEWED'
+  | 'CRYPTO_PAYMENT_RECEIVED';
 
 // ─── Pagination ───────────────────────────────────────────────────────────────
 
@@ -72,7 +77,8 @@ export type PaymentMethod =
   | 'DEDICATED_NUBAN'
   | 'BANK_TRANSFER'
   | 'WALLET'
-  | 'REFUND';
+  | 'REFUND'
+  | 'CRYPTO_USDC';
 
 export interface UserPayment {
   id: string;
@@ -108,6 +114,13 @@ export interface UserDetail extends UserListItem {
     bankName: string;
     accountName: string;
   } | null;
+}
+
+export interface UserDirectoryItem {
+  id: string;
+  displayName: string | null;
+  whatsappNumber: string;
+  createdAt: string;
 }
 
 // ─── Orders ───────────────────────────────────────────────────────────────────

@@ -8,6 +8,7 @@ const METHOD_LABEL: Record<PaymentTimelineEntry['method'], string> = {
   BANK_TRANSFER: 'Bank transfer',
   WALLET: 'Wallet',
   REFUND: 'Refund',
+  CRYPTO_USDC: 'USDC (crypto)',
 };
 
 function formatAmount(raw: string) {

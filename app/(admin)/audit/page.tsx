@@ -45,12 +45,14 @@ import {
 } from '@/components/ui/tooltip';
 import { getAuditLogs } from '@/lib/api/audit';
 import { getAdminDirectory } from '@/lib/api/admins';
+import { getUserDirectory } from '@/lib/api/users';
 import { cn } from '@/lib/utils';
 import type {
   AdminDirectoryItem,
   AuditAction,
   AuditLog,
   PaginatedResponse,
+  UserDirectoryItem,
 } from '@/lib/types';
 
 const PAGE_SIZE = 20;
@@ -62,10 +64,13 @@ const ACTION_VALUES = [
   'WALLET_DEBIT',
   'ORDER_FULFILLED',
   'ORDER_FAILED',
+  'ORDER_REFUNDED',
+  'UNMATCHED_PAYMENT',
   'ORDER_EXPIRED',
   'ADMIN_RESEND',
   'ADMIN_WALLET_CREDIT',
   'ADMIN_FORCE_FULFILL',
+  'ADMIN_PURCHASE_CREATED',
   'USER_CREATED',
   'PIN_SET',
   'PIN_LOCKED',
@@ -83,6 +88,8 @@ const ACTION_VALUES = [
   'VOUCHERS_UPLOADED',
   'FX_RATE_UPDATED',
   'PRODUCTS_RECOMPUTED',
+  'FRAUD_REVIEWED',
+  'CRYPTO_PAYMENT_RECEIVED',
 ] as const satisfies readonly AuditAction[];
 
 const ACTION_LABEL: Record<AuditAction, string> = {
@@ -90,10 +97,13 @@ const ACTION_LABEL: Record<AuditAction, string> = {
   WALLET_DEBIT: 'Wallet debit',
   ORDER_FULFILLED: 'Order fulfilled',
   ORDER_FAILED: 'Order failed',
+  ORDER_REFUNDED: 'Order refunded',
+  UNMATCHED_PAYMENT: 'Unmatched payment',
   ORDER_EXPIRED: 'Order expired',
   ADMIN_RESEND: 'Admin resend',
   ADMIN_WALLET_CREDIT: 'Admin wallet credit',
   ADMIN_FORCE_FULFILL: 'Admin force fulfill',
+  ADMIN_PURCHASE_CREATED: 'Admin purchase created',
   USER_CREATED: 'User created',
   PIN_SET: 'PIN set',
   PIN_LOCKED: 'PIN locked',
@@ -111,6 +121,8 @@ const ACTION_LABEL: Record<AuditAction, string> = {
   VOUCHERS_UPLOADED: 'Vouchers uploaded',
   FX_RATE_UPDATED: 'FX rate updated',
   PRODUCTS_RECOMPUTED: 'Products recomputed',
+  FRAUD_REVIEWED: 'Fraud reviewed',
+  CRYPTO_PAYMENT_RECEIVED: 'Crypto payment received',
 };
 
 const ACTION_SELECT_ITEMS: Record<string, string> = {
@@ -123,10 +135,13 @@ const ACTION_STYLES: Record<AuditAction, string> = {
   WALLET_DEBIT: 'bg-info-100 text-info-700 hover:bg-info-100',
   ORDER_FULFILLED: 'bg-success-100 text-success-700 hover:bg-success-100',
   ORDER_FAILED: 'bg-error-100 text-error-700 hover:bg-error-100',
+  ORDER_REFUNDED: 'bg-warning-100 text-warning-700 hover:bg-warning-100',
+  UNMATCHED_PAYMENT: 'bg-error-100 text-error-700 hover:bg-error-100',
   ORDER_EXPIRED: 'bg-neutral-100 text-neutral-500 hover:bg-neutral-100',
   ADMIN_RESEND: 'bg-info-100 text-info-700 hover:bg-info-100',
   ADMIN_WALLET_CREDIT: 'bg-success-100 text-success-700 hover:bg-success-100',
   ADMIN_FORCE_FULFILL: 'bg-success-100 text-success-700 hover:bg-success-100',
+  ADMIN_PURCHASE_CREATED: 'bg-info-100 text-info-700 hover:bg-info-100',
   USER_CREATED: 'bg-info-100 text-info-700 hover:bg-info-100',
   PIN_SET: 'bg-neutral-100 text-neutral-500 hover:bg-neutral-100',
   PIN_LOCKED: 'bg-warning-100 text-warning-700 hover:bg-warning-100',
@@ -144,6 +159,8 @@ const ACTION_STYLES: Record<AuditAction, string> = {
   VOUCHERS_UPLOADED: 'bg-success-100 text-success-700 hover:bg-success-100',
   FX_RATE_UPDATED: 'bg-warning-100 text-warning-700 hover:bg-warning-100',
   PRODUCTS_RECOMPUTED: 'bg-info-100 text-info-700 hover:bg-info-100',
+  FRAUD_REVIEWED: 'bg-warning-100 text-warning-700 hover:bg-warning-100',
+  CRYPTO_PAYMENT_RECEIVED: 'bg-success-100 text-success-700 hover:bg-success-100',
 };
 
 const auditListParsers = {
@@ -163,11 +180,13 @@ function ActionBadge({ action }: Readonly<{ action: AuditAction }>) {
 }
 
 type AdminLookup = Map<string, AdminDirectoryItem>;
+type UserLookup = Map<string, UserDirectoryItem>;
 
 function ActorCell({
   actor,
   adminLookup,
-}: Readonly<{ actor: string; adminLookup: AdminLookup }>) {
+  userLookup,
+}: Readonly<{ actor: string; adminLookup: AdminLookup; userLookup: UserLookup }>) {
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-/.test(actor);
   if (!isUuid) {
     // 'system', 'admin' (legacy), or a WhatsApp number — display as-is.
@@ -185,6 +204,25 @@ function ActorCell({
               {admin.role === 'SUPER_ADMIN' && (
                 <span className="ml-1 text-muted-foreground">(super)</span>
               )}
+            </span>
+          }
+        />
+        <TooltipContent>{actor}</TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  const user = userLookup.get(actor);
+  if (user) {
+    return (
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <span className="cursor-help text-xs">
+              <span className="font-medium">
+                {user.displayName ?? user.whatsappNumber}
+              </span>
+              <span className="ml-1 text-muted-foreground">(user)</span>
             </span>
           }
         />
@@ -261,7 +299,8 @@ function TimeCell({ iso }: Readonly<{ iso: string }>) {
 function AuditTable({
   logs,
   adminLookup,
-}: Readonly<{ logs: AuditLog[]; adminLookup: AdminLookup }>) {
+  userLookup,
+}: Readonly<{ logs: AuditLog[]; adminLookup: AdminLookup; userLookup: UserLookup }>) {
   const [expanded, setExpanded] = useState<string | null>(null);
 
   return (
@@ -282,7 +321,11 @@ function AuditTable({
               <Fragment key={log.id}>
                 <tr className="border-t border-border/60 align-middle">
                   <td className="px-3 py-2">
-                    <ActorCell actor={log.actor} adminLookup={adminLookup} />
+                    <ActorCell
+                      actor={log.actor}
+                      adminLookup={adminLookup}
+                      userLookup={userLookup}
+                    />
                   </td>
                   <td className="px-3 py-2">
                     <ActionBadge action={log.action} />
@@ -340,6 +383,7 @@ interface AuditBodyProps {
   refetch: () => void;
   data: PaginatedResponse<AuditLog> | undefined;
   adminLookup: AdminLookup;
+  userLookup: UserLookup;
 }
 
 function AuditBody({
@@ -348,6 +392,7 @@ function AuditBody({
   refetch,
   data,
   adminLookup,
+  userLookup,
 }: Readonly<AuditBodyProps>) {
   if (isError) {
     return (
@@ -369,7 +414,13 @@ function AuditBody({
       />
     );
   }
-  return <AuditTable logs={data.data} adminLookup={adminLookup} />;
+  return (
+    <AuditTable
+      logs={data.data}
+      adminLookup={adminLookup}
+      userLookup={userLookup}
+    />
+  );
 }
 
 const safeParseDate = (value: string | null): Date | undefined => {
@@ -386,11 +437,12 @@ const formatRangeLabel = (from?: Date, to?: Date) => {
 
 interface AuditFiltersProps {
   directory: AdminDirectoryItem[];
+  users: UserDirectoryItem[];
 }
 
 const SYSTEM_ACTOR = 'system';
 
-function AuditFilters({ directory }: Readonly<AuditFiltersProps>) {
+function AuditFilters({ directory, users }: Readonly<AuditFiltersProps>) {
   const [filters, setFilters] = useQueryStates(auditListParsers, {
     shallow: false,
   });
@@ -408,6 +460,11 @@ function AuditFilters({ directory }: Readonly<AuditFiltersProps>) {
   actorSelectItems[SYSTEM_ACTOR] = 'System';
   for (const admin of directory) {
     actorSelectItems[admin.id] = admin.displayName;
+  }
+  for (const user of users) {
+    actorSelectItems[user.id] = user.displayName
+      ? `${user.displayName} (user)`
+      : `${user.whatsappNumber} (user)`;
   }
   // If the URL has an actor value that isn't in the directory (e.g. a user
   // UUID from a PIN_SET event, or a deactivated admin), keep it selectable
@@ -553,9 +610,17 @@ function AuditContent() {
     queryFn: getAdminDirectory,
     staleTime: 5 * 60_000,
   });
+  const { data: userDirectory } = useQuery({
+    queryKey: ['user-directory'],
+    queryFn: () => getUserDirectory(300),
+    staleTime: 5 * 60_000,
+  });
 
   const adminLookup: AdminLookup = new Map(
     (directory ?? []).map((a) => [a.id, a]),
+  );
+  const userLookup: UserLookup = new Map(
+    (userDirectory ?? []).map((u) => [u.id, u]),
   );
 
   return (
@@ -566,7 +631,7 @@ function AuditContent() {
       />
 
       <div className="mb-4">
-        <AuditFilters directory={directory ?? []} />
+        <AuditFilters directory={directory ?? []} users={userDirectory ?? []} />
       </div>
 
       <AuditBody
@@ -575,6 +640,7 @@ function AuditContent() {
         refetch={refetch}
         data={data}
         adminLookup={adminLookup}
+        userLookup={userLookup}
       />
 
       {data && data.data.length > 0 && (

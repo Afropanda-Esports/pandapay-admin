@@ -1,5 +1,11 @@
 import { apiFetch } from './client';
-import type { PaginatedResponse, UserListItem, UserDetail, UserPayment } from '@/lib/types';
+import type {
+  PaginatedResponse,
+  UserListItem,
+  UserDetail,
+  UserPayment,
+  UserDirectoryItem,
+} from '@/lib/types';
 
 interface GetUsersParams {
   page?: number;
@@ -29,3 +35,6 @@ export const getUserPayments = (id: string, page = 1, limit = 20) => {
   const q = new URLSearchParams({ page: String(page), limit: String(limit) });
   return apiFetch<PaginatedResponse<UserPayment>>(`/admin/users/${id}/payments?${q}`);
 };
+
+export const getUserDirectory = (limit = 200) =>
+  apiFetch<UserDirectoryItem[]>(`/admin/users/directory?limit=${limit}`);
