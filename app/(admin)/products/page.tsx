@@ -80,17 +80,27 @@ function StockBar({ stats }: Readonly<{ stats: ProductWithStats['voucherStats'] 
   );
 }
 
-function AvailabilityBadge({ isAvailable }: Readonly<{ isAvailable: boolean }>) {
-  if (isAvailable) {
+function AvailabilityBadge({
+  isAvailable,
+  stockAvailable,
+}: Readonly<{ isAvailable: boolean; stockAvailable: number }>) {
+  if (!isAvailable) {
     return (
-      <Badge className="bg-success-100 text-success-700 hover:bg-success-100 border-0">
-        Available
+      <Badge className="bg-neutral-100 text-neutral-500 hover:bg-neutral-100 border-0">
+        Unavailable
+      </Badge>
+    );
+  }
+  if (stockAvailable === 0) {
+    return (
+      <Badge className="bg-error-100 text-error-700 hover:bg-error-100 border-0">
+        Out of stock
       </Badge>
     );
   }
   return (
-    <Badge className="bg-neutral-100 text-neutral-500 hover:bg-neutral-100 border-0">
-      Unavailable
+    <Badge className="bg-success-100 text-success-700 hover:bg-success-100 border-0">
+      Available
     </Badge>
   );
 }
@@ -101,7 +111,10 @@ function ProductCard({ product }: Readonly<{ product: ProductWithStats }>) {
       <CardHeader>
         <div className="flex items-start justify-between gap-3">
           <CardTitle className="text-base">{product.name}</CardTitle>
-          <AvailabilityBadge isAvailable={product.isAvailable} />
+          <AvailabilityBadge
+            isAvailable={product.isAvailable}
+            stockAvailable={product.voucherStats.available}
+          />
         </div>
         <p className="text-xs text-muted-foreground">
           {CATEGORY_LABEL[product.category]} ·{' '}
