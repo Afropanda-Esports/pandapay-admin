@@ -43,6 +43,28 @@ const formatPrice = (price: string, currency: string) => {
   return currency === 'NGN' ? `₦${formatted}` : `${formatted} ${currency}`;
 };
 
+function productStatusBadge(isAvailable: boolean, stockAvailable: number) {
+  if (isAvailable && stockAvailable > 0) {
+    return (
+      <Badge className="bg-success-100 text-success-700 hover:bg-success-100 border-0">
+        Available
+      </Badge>
+    );
+  }
+  if (isAvailable && stockAvailable === 0) {
+    return (
+      <Badge className="bg-error-100 text-error-700 hover:bg-error-100 border-0">
+        Out of stock
+      </Badge>
+    );
+  }
+  return (
+    <Badge className="bg-neutral-100 text-neutral-500 hover:bg-neutral-100 border-0">
+      Unavailable
+    </Badge>
+  );
+}
+
 const stockBarColor = (available: number, total: number) => {
   if (total === 0) return 'bg-neutral-300';
   const ratio = available / total;
@@ -89,17 +111,7 @@ function DetailsCard({
           <DetailRow label="Currency" value={product.currency} />
           <DetailRow
             label="Status"
-            value={
-              product.isAvailable ? (
-                <Badge className="bg-success-100 text-success-700 hover:bg-success-100 border-0">
-                  Available
-                </Badge>
-              ) : (
-                <Badge className="bg-neutral-100 text-neutral-500 hover:bg-neutral-100 border-0">
-                  Unavailable
-                </Badge>
-              )
-            }
+            value={productStatusBadge(product.isAvailable, product.voucherStats.available)}
           />
         </div>
         <div className="mt-4 flex justify-end">

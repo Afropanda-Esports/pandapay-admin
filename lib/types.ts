@@ -1,6 +1,6 @@
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
-export type OrderStatus = 'PENDING' | 'PAID' | 'FULFILLED' | 'EXPIRED' | 'FAILED';
+export type OrderStatus = 'PENDING' | 'PAID' | 'FULFILLED' | 'EXPIRED' | 'FAILED' | 'REFUNDED';
 export type PaymentMode = 'WALLET' | 'DIRECT_TRANSFER' | 'CRYPTO';
 export type ProductCategory = 'GIFT_CARD' | 'GAME_TOP_UP' | 'AIRTIME';
 export type AdminRole = 'SUPER_ADMIN' | 'ADMIN';

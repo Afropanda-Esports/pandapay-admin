@@ -34,6 +34,7 @@ const STATUS_VALUES = [
   'FULFILLED',
   'EXPIRED',
   'FAILED',
+  'REFUNDED',
 ] as const satisfies readonly OrderStatus[];
 
 const STATUS_LABEL: Record<OrderStatus, string> = {
@@ -42,6 +43,7 @@ const STATUS_LABEL: Record<OrderStatus, string> = {
   FULFILLED: 'Fulfilled',
   EXPIRED: 'Expired',
   FAILED: 'Failed',
+  REFUNDED: 'Refunded',
 };
 
 const ALL = '__all__';
@@ -53,6 +55,7 @@ const STATUS_SELECT_ITEMS: Record<string, string> = {
   FULFILLED: STATUS_LABEL.FULFILLED,
   EXPIRED: STATUS_LABEL.EXPIRED,
   FAILED: STATUS_LABEL.FAILED,
+  REFUNDED: STATUS_LABEL.REFUNDED,
 };
 
 export const orderListParsers = {
