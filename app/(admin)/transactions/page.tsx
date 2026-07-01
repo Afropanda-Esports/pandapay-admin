@@ -40,7 +40,8 @@ import {
   retryOrder,
 } from '@/lib/api/orders';
 import { getProducts } from '@/lib/api/products';
-import { getUsers } from '@/lib/api/users';
+import { getUserDirectory } from '@/lib/api/users';
+import { formatOrderSource } from '@/lib/order-source';
 import type { Order, OrderStatus, PaymentMode } from '@/lib/types';
 
 const PAGE_SIZE = 20;
@@ -85,7 +86,7 @@ export default function TransactionsPage() {
 
   const usersQuery = useQuery({
     queryKey: ['transactions-users'],
-    queryFn: () => getUsers({ page: 1, limit: 100 }),
+    queryFn: () => getUserDirectory(500),
   });
   const productsQuery = useQuery({
     queryKey: ['transactions-products'],
@@ -192,7 +193,7 @@ export default function TransactionsPage() {
                   <SelectValue placeholder="Select user" />
                 </SelectTrigger>
                 <SelectContent>
-                  {(usersQuery.data?.data ?? []).map((u) => (
+                  {(usersQuery.data ?? []).map((u) => (
                     <SelectItem key={u.id} value={u.id}>
                       {u.displayName ?? u.whatsappNumber}
                     </SelectItem>
@@ -314,6 +315,7 @@ export default function TransactionsPage() {
                     <th className="px-3 py-2 font-medium">Product</th>
                     <th className="px-3 py-2 font-medium">Amount</th>
                     <th className="px-3 py-2 font-medium">Mode</th>
+                    <th className="px-3 py-2 font-medium">Source</th>
                     <th className="px-3 py-2 font-medium">Status</th>
                     <th className="px-3 py-2 font-medium">Created</th>
                     <th className="px-3 py-2 font-medium text-right">Actions</th>
@@ -327,6 +329,9 @@ export default function TransactionsPage() {
                       <td className="px-3 py-2">{order.product?.name ?? '—'}</td>
                       <td className="px-3 py-2">{formatAmount(order.amount)}</td>
                       <td className="px-3 py-2">{order.paymentMode}</td>
+                      <td className="px-3 py-2 text-xs text-muted-foreground">
+                        {formatOrderSource(order.source)}
+                      </td>
                       <td className="px-3 py-2">
                         <Badge variant="outline">{order.status}</Badge>
                       </td>

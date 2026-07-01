@@ -7,6 +7,7 @@ import {
   Copy,
   KeyRound,
   Lock,
+  Pencil,
   RefreshCw,
   ShieldCheck,
   ShieldOff,
@@ -37,6 +38,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Tooltip,
@@ -109,6 +112,8 @@ interface AdminRowProps {
 function AdminRow({ admin, isSelf }: Readonly<AdminRowProps>) {
   const queryClient = useQueryClient();
   const [tempPassword, setTempPassword] = useState<string | null>(null);
+  const [editNameOpen, setEditNameOpen] = useState(false);
+  const [displayNameDraft, setDisplayNameDraft] = useState(admin.displayName);
 
   const setActive = useMutation({
     mutationFn: (next: boolean) =>
@@ -153,6 +158,21 @@ function AdminRow({ admin, isSelf }: Readonly<AdminRowProps>) {
     onError: (err) => {
       const message =
         err instanceof ApiError ? err.message : 'Could not reset password';
+      toast.error(message);
+    },
+  });
+
+  const renameAdmin = useMutation({
+    mutationFn: () => updateAdmin(admin.id, { displayName: displayNameDraft.trim() }),
+    onSuccess: () => {
+      toast.success('Display name updated');
+      queryClient.invalidateQueries({ queryKey: ['admins'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-directory'] });
+      setEditNameOpen(false);
+    },
+    onError: (err) => {
+      const message =
+        err instanceof ApiError ? err.message : 'Could not update name';
       toast.error(message);
     },
   });
@@ -216,6 +236,19 @@ function AdminRow({ admin, isSelf }: Readonly<AdminRowProps>) {
               }
             />
             <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem
+                onSelect={(e) => {
+                  e.preventDefault();
+                  setDisplayNameDraft(admin.displayName);
+                  setEditNameOpen(true);
+                }}
+              >
+                <Pencil className="size-4" />
+                Edit name
+              </DropdownMenuItem>
+
+              <DropdownMenuSeparator />
+
               <ConfirmDialog
                 trigger={
                   <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
@@ -349,6 +382,49 @@ function AdminRow({ admin, isSelf }: Readonly<AdminRowProps>) {
 
           <DialogFooter>
             <Button onClick={() => setTempPassword(null)}>Done</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editNameOpen} onOpenChange={setEditNameOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit display name</DialogTitle>
+            <DialogDescription>
+              Update how {admin.email} appears in the audit log and team list.
+            </DialogDescription>
+          </DialogHeader>
+          <FieldGroup className="py-2">
+            <Field>
+              <FieldLabel htmlFor={`admin-name-${admin.id}`}>Display name</FieldLabel>
+              <Input
+                id={`admin-name-${admin.id}`}
+                value={displayNameDraft}
+                onChange={(e) => setDisplayNameDraft(e.target.value)}
+                disabled={renameAdmin.isPending}
+                minLength={2}
+              />
+              {displayNameDraft.trim().length < 2 ? (
+                <FieldError>Min 2 characters</FieldError>
+              ) : null}
+            </Field>
+          </FieldGroup>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setEditNameOpen(false)}
+              disabled={renameAdmin.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => renameAdmin.mutate()}
+              disabled={
+                renameAdmin.isPending || displayNameDraft.trim().length < 2
+              }
+            >
+              {renameAdmin.isPending ? 'Saving…' : 'Save'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

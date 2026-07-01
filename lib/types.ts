@@ -1,8 +1,19 @@
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
-export type OrderStatus = 'PENDING' | 'PAID' | 'FULFILLED' | 'EXPIRED' | 'FAILED' | 'REFUNDED';
+export type OrderStatus =
+  | 'PENDING'
+  | 'PAID'
+  | 'FULFILLED'
+  | 'EXPIRED'
+  | 'FAILED';
 export type PaymentMode = 'WALLET' | 'DIRECT_TRANSFER' | 'CRYPTO';
-export type ProductCategory = 'GIFT_CARD' | 'GAME_TOP_UP' | 'AIRTIME';
+export type OrderSource = 'whatsapp' | 'web_store' | 'agent';
+export type ProductCategory =
+  | 'GIFT_CARD'
+  | 'GAME_TOP_UP'
+  | 'AIRTIME'
+  | 'CONSOLE_VOUCHER'
+  | 'ENTERTAINMENT';
 export type AdminRole = 'SUPER_ADMIN' | 'ADMIN';
 export type AuditAction =
   | 'WALLET_CREDIT'
@@ -34,7 +45,9 @@ export type AuditAction =
   | 'FX_RATE_UPDATED'
   | 'PRODUCTS_RECOMPUTED'
   | 'FRAUD_REVIEWED'
-  | 'CRYPTO_PAYMENT_RECEIVED';
+  | 'CRYPTO_PAYMENT_RECEIVED'
+  | 'FEATURE_FLAG_UPDATED'
+  | 'VOUCHER_DELIVERY_FAILED';
 
 // ─── Pagination ───────────────────────────────────────────────────────────────
 
@@ -152,6 +165,7 @@ export interface Order {
   amount: string;
   paymentMode: PaymentMode;
   status: OrderStatus;
+  source?: OrderSource;
   paystackReference: string | null;
   expiresAt: string | null;
   createdAt: string;
@@ -246,6 +260,20 @@ export interface AdminDirectoryItem {
   id: string;
   displayName: string;
   role: AdminRole;
+}
+
+// ─── Feature flags ────────────────────────────────────────────────────────────
+
+export interface FeatureFlag {
+  id: string;
+  key: string;
+  enabled: boolean;
+  activeFrom: string | null;
+  activeUntil: string | null;
+  description: string | null;
+  updatedBy: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 /** Returned by `/api/auth/login` — JWT is stored in HttpOnly cookie only. */

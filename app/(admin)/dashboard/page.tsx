@@ -23,7 +23,7 @@ import { usePermissions } from '@/hooks/use-permissions';
 import { createPurchase } from '@/lib/api/orders';
 import { getProducts } from '@/lib/api/products';
 import { getStats } from '@/lib/api/stats';
-import { getUsers } from '@/lib/api/users';
+import { getUserDirectory } from '@/lib/api/users';
 import type { PaymentMode } from '@/lib/types';
 
 const formatNgn = (n: number) => `₦${n.toLocaleString('en-NG')}`;
@@ -42,14 +42,14 @@ function OperationsCard() {
 
   const usersQuery = useQuery({
     queryKey: ['dashboard-users'],
-    queryFn: () => getUsers({ page: 1, limit: 100 }),
+    queryFn: () => getUserDirectory(500),
   });
   const productsQuery = useQuery({
     queryKey: ['dashboard-products'],
     queryFn: () => getProducts(),
   });
 
-  const users = usersQuery.data?.data ?? [];
+  const users = usersQuery.data ?? [];
   const products = productsQuery.data ?? [];
 
   const selectedProduct = useMemo(

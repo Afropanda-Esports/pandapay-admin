@@ -90,6 +90,8 @@ const ACTION_VALUES = [
   'PRODUCTS_RECOMPUTED',
   'FRAUD_REVIEWED',
   'CRYPTO_PAYMENT_RECEIVED',
+  'FEATURE_FLAG_UPDATED',
+  'VOUCHER_DELIVERY_FAILED',
 ] as const satisfies readonly AuditAction[];
 
 const ACTION_LABEL: Record<AuditAction, string> = {
@@ -123,6 +125,8 @@ const ACTION_LABEL: Record<AuditAction, string> = {
   PRODUCTS_RECOMPUTED: 'Products recomputed',
   FRAUD_REVIEWED: 'Fraud reviewed',
   CRYPTO_PAYMENT_RECEIVED: 'Crypto payment received',
+  FEATURE_FLAG_UPDATED: 'Feature flag updated',
+  VOUCHER_DELIVERY_FAILED: 'Voucher delivery failed',
 };
 
 const ACTION_SELECT_ITEMS: Record<string, string> = {
@@ -161,6 +165,8 @@ const ACTION_STYLES: Record<AuditAction, string> = {
   PRODUCTS_RECOMPUTED: 'bg-info-100 text-info-700 hover:bg-info-100',
   FRAUD_REVIEWED: 'bg-warning-100 text-warning-700 hover:bg-warning-100',
   CRYPTO_PAYMENT_RECEIVED: 'bg-success-100 text-success-700 hover:bg-success-100',
+  FEATURE_FLAG_UPDATED: 'bg-info-100 text-info-700 hover:bg-info-100',
+  VOUCHER_DELIVERY_FAILED: 'bg-error-100 text-error-700 hover:bg-error-100',
 };
 
 const auditListParsers = {

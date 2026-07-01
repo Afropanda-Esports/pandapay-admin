@@ -15,7 +15,9 @@ export type AdminPermission =
   | 'fraud:view'
   | 'fraud:manage'
   | 'audit:view'
-  | 'admins:manage';
+  | 'admins:manage'
+  | 'feature-flags:view'
+  | 'feature-flags:manage';
 
 const MANAGER_PERMISSIONS: AdminPermission[] = [
   'dashboard:view',
@@ -29,6 +31,7 @@ const MANAGER_PERMISSIONS: AdminPermission[] = [
   'fraud:view',
   'fraud:manage',
   'audit:view',
+  'feature-flags:view',
 ];
 
 const SUPER_ADMIN_PERMISSIONS: AdminPermission[] = [
@@ -36,6 +39,7 @@ const SUPER_ADMIN_PERMISSIONS: AdminPermission[] = [
   'products:pricing',
   'pricing:manage',
   'admins:manage',
+  'feature-flags:manage',
 ];
 
 const ROLE_PERMISSIONS: Record<AdminRole, ReadonlySet<AdminPermission>> = {
