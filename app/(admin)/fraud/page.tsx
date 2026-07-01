@@ -3,9 +3,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
 import { RefreshCw } from 'lucide-react';
+import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { PageHeader } from '@/components/shared/page-header';
+import { PaginationControls } from '@/components/shared/pagination-controls';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -16,11 +18,15 @@ import {
   type FraudEvent,
 } from '@/lib/api/fraud';
 
+const PAGE_SIZE = 20;
+
 export default function FraudReviewPage() {
   const queryClient = useQueryClient();
+  const [page, setPage] = useState(1);
+
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['fraud-events'],
-    queryFn: () => listFraudEvents(1, 50),
+    queryKey: ['fraud-events', page],
+    queryFn: () => listFraudEvents(page, PAGE_SIZE),
   });
 
   const approve = useMutation({
@@ -67,17 +73,29 @@ export default function FraudReviewPage() {
           </CardContent>
         </Card>
       ) : (
-        <ul className="space-y-4">
-          {events.map((event) => (
-            <FraudCard
-              key={event.id}
-              event={event}
-              onApprove={() => approve.mutate(event.id)}
-              onReject={() => reject.mutate(event.id)}
-              busy={approve.isPending || reject.isPending}
-            />
-          ))}
-        </ul>
+        <>
+          <ul className="space-y-4">
+            {events.map((event) => (
+              <FraudCard
+                key={event.id}
+                event={event}
+                onApprove={() => approve.mutate(event.id)}
+                onReject={() => reject.mutate(event.id)}
+                busy={approve.isPending || reject.isPending}
+              />
+            ))}
+          </ul>
+          {data && data.total > PAGE_SIZE ? (
+            <div className="mt-4">
+              <PaginationControls
+                page={page}
+                limit={PAGE_SIZE}
+                total={data.total}
+                onPageChange={setPage}
+              />
+            </div>
+          ) : null}
+        </>
       )}
     </div>
   );

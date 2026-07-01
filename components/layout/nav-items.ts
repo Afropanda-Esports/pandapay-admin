@@ -8,6 +8,7 @@ import {
   ShieldCheck,
   ShieldAlert,
   Coins,
+  Flag,
   type LucideIcon,
 } from 'lucide-react';
 import type { AdminPermission } from '@/lib/permissions';
@@ -27,6 +28,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: 'Products', href: '/products', icon: Package, permission: 'products:view' },
   { label: 'Pricing', href: '/pricing', icon: Coins, permission: 'pricing:view' },
   { label: 'Fraud Review', href: '/fraud', icon: ShieldAlert, permission: 'fraud:view' },
+  { label: 'Feature Flags', href: '/feature-flags', icon: Flag, permission: 'feature-flags:view' },
   { label: 'Audit Log', href: '/audit', icon: FileText, permission: 'audit:view' },
   {
     label: 'Team',

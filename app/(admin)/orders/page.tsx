@@ -32,6 +32,7 @@ import {
 } from '@/components/ui/tooltip';
 import { ApiError } from '@/lib/api/client';
 import { getOrders, resendOrder } from '@/lib/api/orders';
+import { formatOrderSource } from '@/lib/order-source';
 import type { Order, PaginatedResponse, PaymentMode } from '@/lib/types';
 
 const PAGE_SIZE = 20;
@@ -134,6 +135,7 @@ function OrdersTable({ orders }: Readonly<OrdersTableProps>) {
             <th className="px-3 py-2 font-medium">Product</th>
             <th className="px-3 py-2 font-medium">Amount</th>
             <th className="px-3 py-2 font-medium">Mode</th>
+            <th className="px-3 py-2 font-medium">Source</th>
             <th className="px-3 py-2 font-medium">Status</th>
             <th className="px-3 py-2 font-medium">Date</th>
             <th className="px-3 py-2 font-medium text-right">Actions</th>
@@ -163,6 +165,9 @@ function OrdersTable({ orders }: Readonly<OrdersTableProps>) {
               </td>
               <td className="px-3 py-2">
                 <PaymentModeBadge mode={order.paymentMode} />
+              </td>
+              <td className="px-3 py-2 text-xs text-muted-foreground">
+                {formatOrderSource(order.source)}
               </td>
               <td className="px-3 py-2">
                 <StatusBadge status={order.status} />

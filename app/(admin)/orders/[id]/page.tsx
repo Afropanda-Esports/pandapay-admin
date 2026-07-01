@@ -15,6 +15,7 @@ import { use } from 'react';
 import { toast } from 'sonner';
 
 import { PaymentTimeline } from '@/components/orders/payment-timeline';
+import { RecordRefundDialog } from '@/components/features/orders/record-refund-dialog';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { PageHeader } from '@/components/shared/page-header';
 import { StatusBadge } from '@/components/shared/status-badge';
@@ -29,7 +30,8 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { ApiError } from '@/lib/api/client';
 import { usePermissions } from '@/hooks/use-permissions';
-import { getOrder, resendOrder, fulfillOrder } from '@/lib/api/orders';
+import { getOrder, resendOrder, fulfillOrder, refundOrder, retryOrder } from '@/lib/api/orders';
+import { formatOrderSource } from '@/lib/order-source';
 import type { OrderDetail, PaymentMode } from '@/lib/types';
 
 const PAYMENT_MODE_LABEL: Record<PaymentMode, string> = {
@@ -117,6 +119,7 @@ function OrderInfo({ order }: Readonly<{ order: OrderDetail }>) {
         value={<span className="font-mono text-xs">{order.id}</span>}
       />
       <DetailRow label="Status" value={<StatusBadge status={order.status} />} />
+      <DetailRow label="Source" value={formatOrderSource(order.source)} />
       <DetailRow label="Amount" value={formatAmount(order.amount)} />
       <DetailRow label="Created" value={formatDateTime(order.createdAt)} />
       {order.expiresAt && (
@@ -282,6 +285,44 @@ export default function OrderDetailPage({
     },
   });
 
+  const refundMutation = useMutation({
+    mutationFn: (args: {
+      refundChannel: string;
+      externalReference?: string;
+      note?: string;
+    }) =>
+      refundOrder(id, {
+        refundChannel: args.refundChannel,
+        externalReference: args.externalReference,
+        note: args.note,
+      }),
+    onSuccess: ({ reference }) => {
+      toast.success(`Refund recorded (${reference})`);
+      queryClient.invalidateQueries({ queryKey: ['order', id] });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+    },
+    onError: (err) => {
+      const message =
+        err instanceof ApiError ? err.message : 'Could not process refund';
+      toast.error(message);
+    },
+  });
+
+  const retryMutation = useMutation({
+    mutationFn: () => retryOrder(id),
+    onSuccess: ({ orderId }) => {
+      toast.success(`Retry order created (${orderId.slice(0, 8)}…)`);
+      queryClient.invalidateQueries({ queryKey: ['order', id] });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+    },
+    onError: (err) => {
+      const message =
+        err instanceof ApiError ? err.message : 'Could not retry order';
+      toast.error(message);
+    },
+  });
+
   const backLink = (
     <Button variant="ghost" size="sm" render={<Link href="/orders" />}>
       <ArrowLeft className="size-4" />
@@ -314,11 +355,16 @@ export default function OrderDetailPage({
   }
 
   const isInconsistent = order.voucherAssigned && !order.voucherIsUsed;
-  const canResend = order.status === 'FULFILLED' && can('orders:manage');
-  const canFulfill = order.status === 'PAID' && can('orders:manage');
+  const canManage = can('orders:manage');
+  const canResend = order.status === 'FULFILLED' && canManage;
+  const canFulfill = order.status === 'PAID' && canManage;
+  const canRefund =
+    (order.status === 'PAID' || order.status === 'FULFILLED') && canManage;
+  const canRetryOrder =
+    (order.status === 'FAILED' || order.status === 'EXPIRED') && canManage;
 
   const actions = (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
       {backLink}
       {canFulfill && (
         <ConfirmDialog
@@ -351,6 +397,40 @@ export default function OrderDetailPage({
           isPending={resendMutation.isPending}
           onConfirm={async () => {
             await resendMutation.mutateAsync();
+          }}
+        />
+      )}
+      {canRefund && (
+        <RecordRefundDialog
+          orderSummary={`${order.product?.name ?? 'Order'} · ${formatAmount(order.amount)}`}
+          isPending={refundMutation.isPending}
+          trigger={
+            <Button variant="outline" disabled={refundMutation.isPending}>
+              Record refund
+            </Button>
+          }
+          onSubmit={async (payload) => {
+            await refundMutation.mutateAsync({
+              refundChannel: payload.refundChannel,
+              externalReference: payload.externalReference,
+              note: payload.note,
+            });
+          }}
+        />
+      )}
+      {canRetryOrder && (
+        <ConfirmDialog
+          trigger={
+            <Button variant="outline" disabled={retryMutation.isPending}>
+              Retry order
+            </Button>
+          }
+          title="Create retry order?"
+          description="Creates a new pending order for the same user and product."
+          confirmLabel="Retry"
+          isPending={retryMutation.isPending}
+          onConfirm={async () => {
+            await retryMutation.mutateAsync();
           }}
         />
       )}

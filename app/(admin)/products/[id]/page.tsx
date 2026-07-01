@@ -13,6 +13,7 @@ import { use } from 'react';
 import { toast } from 'sonner';
 
 import { PricingCard } from '@/components/features/products/pricing-card';
+import { RenameProductDialog } from '@/components/features/products/rename-product-dialog';
 import { UploadVouchersDialog } from '@/components/features/products/upload-vouchers-dialog';
 import { PageHeader } from '@/components/shared/page-header';
 import { Badge } from '@/components/ui/badge';
@@ -26,14 +27,9 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { ApiError } from '@/lib/api/client';
 import { getProduct, updateProduct } from '@/lib/api/products';
-import type { ProductCategory, ProductWithStats } from '@/lib/types';
+import { CATEGORY_LABEL } from '@/lib/product-categories';
+import type { ProductWithStats } from '@/lib/types';
 import { cn } from '@/lib/utils';
-
-const CATEGORY_LABEL: Record<ProductCategory, string> = {
-  GIFT_CARD: 'Gift Card',
-  GAME_TOP_UP: 'Game Top-up',
-  AIRTIME: 'Airtime',
-};
 
 const formatPrice = (price: string, currency: string) => {
   const n = Number.parseFloat(price);
@@ -297,6 +293,10 @@ export default function ProductDetailPage({
         actions={
           <div className="flex items-center gap-2">
             {backLink}
+            <RenameProductDialog
+              productId={product.id}
+              currentName={product.name}
+            />
             <UploadVouchersDialog
               productId={product.id}
               productName={product.name}

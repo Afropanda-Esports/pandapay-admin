@@ -20,23 +20,13 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { getProducts } from '@/lib/api/products';
-import type { ProductCategory, ProductWithStats } from '@/lib/types';
+import {
+  CATEGORY_LABEL,
+  PRODUCT_CATEGORY_TABS,
+  type ProductCategoryTab,
+} from '@/lib/product-categories';
+import type { ProductWithStats } from '@/lib/types';
 import { cn } from '@/lib/utils';
-
-type Tab = 'ALL' | ProductCategory;
-
-const TABS: { value: Tab; label: string }[] = [
-  { value: 'ALL', label: 'All' },
-  { value: 'GIFT_CARD', label: 'Gift Cards' },
-  { value: 'GAME_TOP_UP', label: 'Game Top-ups' },
-  { value: 'AIRTIME', label: 'Airtime' },
-];
-
-const CATEGORY_LABEL: Record<ProductCategory, string> = {
-  GIFT_CARD: 'Gift Card',
-  GAME_TOP_UP: 'Game Top-up',
-  AIRTIME: 'Airtime',
-};
 
 const SKELETON_KEYS = ['s1', 's2', 's3', 's4', 's5', 's6'];
 
@@ -179,7 +169,7 @@ function ProductsError({ onRetry }: Readonly<{ onRetry: () => void }>) {
   );
 }
 
-function ProductsEmpty({ tab }: Readonly<{ tab: Tab }>) {
+function ProductsEmpty({ tab }: Readonly<{ tab: ProductCategoryTab }>) {
   const isAll = tab === 'ALL';
   return (
     <EmptyState
@@ -214,7 +204,7 @@ function ProductsBody({
   isError: boolean;
   refetch: () => void;
   products: ProductWithStats[] | undefined;
-  tab: Tab;
+  tab: ProductCategoryTab;
 }>) {
   if (isError) return <ProductsError onRetry={refetch} />;
   if (isLoading || !products) return <ProductsLoading />;
@@ -223,15 +213,15 @@ function ProductsBody({
 }
 
 export default function ProductsPage() {
-  const [tab, setTab] = useState<Tab>('ALL');
+  const [tab, setTab] = useState<ProductCategoryTab>('ALL');
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['products'],
-    queryFn: () => getProducts(),
+    queryKey: ['products', tab],
+    queryFn: () =>
+      getProducts(tab === 'ALL' ? undefined : tab),
   });
 
-  const filtered =
-    !data || tab === 'ALL' ? data : data.filter((p) => p.category === tab);
+  const products = data;
 
   return (
     <div>
@@ -243,11 +233,11 @@ export default function ProductsPage() {
 
       <Tabs
         value={tab}
-        onValueChange={(v) => setTab(v as Tab)}
+        onValueChange={(v) => setTab(v as ProductCategoryTab)}
         className="mb-4"
       >
         <TabsList>
-          {TABS.map((t) => (
+          {PRODUCT_CATEGORY_TABS.map((t) => (
             <TabsTrigger key={t.value} value={t.value}>
               {t.label}
             </TabsTrigger>
@@ -259,7 +249,7 @@ export default function ProductsPage() {
         isLoading={isLoading}
         isError={isError}
         refetch={refetch}
-        products={filtered}
+        products={products}
         tab={tab}
       />
     </div>
