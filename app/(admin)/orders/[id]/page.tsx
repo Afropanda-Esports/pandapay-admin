@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 
 import { PaymentTimeline } from '@/components/orders/payment-timeline';
 import { RecordRefundDialog } from '@/components/features/orders/record-refund-dialog';
+import { ResolvePaymentExceptionDialog } from '@/components/features/orders/resolve-payment-exception-dialog';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { PageHeader } from '@/components/shared/page-header';
 import { StatusBadge } from '@/components/shared/status-badge';
@@ -84,6 +85,52 @@ function FulfillmentInconsistencyAlert() {
       <AlertDescription>
         A voucher was assigned to this order but is not marked as used.
         Investigate before resending.
+      </AlertDescription>
+    </Alert>
+  );
+}
+
+function OverpaymentExceptionAlert({
+  order,
+  canManage,
+  onResolved,
+}: Readonly<{
+  order: OrderDetail;
+  canManage: boolean;
+  onResolved: () => void;
+}>) {
+  const ex = order.paymentException;
+  if (!ex || ex.status === 'RESOLVED') return null;
+
+  const isFailed = ex.status === 'REFUND_FAILED';
+
+  return (
+    <Alert variant={isFailed ? 'destructive' : 'default'} className="mb-4">
+      <AlertTriangle className="size-4" />
+      <AlertTitle>
+        {isFailed ? 'Overpayment — refund failed' : 'Overpayment — refund initiated'}
+      </AlertTitle>
+      <AlertDescription className="space-y-2">
+        <p>
+          Customer sent {formatAmount(ex.receivedAmount)} for an order of{' '}
+          {formatAmount(ex.expectedAmount)}. Excess{' '}
+          {formatAmount(ex.excessAmount)}
+          {isFailed
+            ? ' could not be auto-refunded — process manually in Paystack.'
+            : ' refund was initiated via Paystack.'}
+        </p>
+        {canManage && ex.status !== 'RESOLVED' ? (
+          <ResolvePaymentExceptionDialog
+            exceptionId={ex.id}
+            excessAmount={ex.excessAmount}
+            onResolved={onResolved}
+            trigger={
+              <Button size="sm" variant="secondary" className="mt-1">
+                Mark resolved
+              </Button>
+            }
+          />
+        ) : null}
       </AlertDescription>
     </Alert>
   );
@@ -446,6 +493,15 @@ export default function OrderDetailPage({
       />
 
       {isInconsistent && <FulfillmentInconsistencyAlert />}
+
+      <OverpaymentExceptionAlert
+        order={order}
+        canManage={canManage}
+        onResolved={() => {
+          void queryClient.invalidateQueries({ queryKey: ['order', id] });
+          void queryClient.invalidateQueries({ queryKey: ['payment-exceptions'] });
+        }}
+      />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <OrderInfo order={order} />
