@@ -26,7 +26,7 @@ export default function FeatureFlagsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Feature flags"
-        description="Toggle beta features and optional time windows. Changes take effect immediately."
+        description="Toggle beta features and optional time windows. On/Off saves immediately; schedule fields use Save schedule."
         actions={
           <Button variant="outline" size="sm" onClick={() => refetch()}>
             <RefreshCw className="mr-2 size-4" />

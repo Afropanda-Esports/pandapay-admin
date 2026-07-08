@@ -2,7 +2,7 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
@@ -58,16 +58,41 @@ export function FeatureFlagRow({
   );
   const [description, setDescription] = useState(flag.description ?? '');
 
-  const mutation = useMutation({
+  const hasScheduleChanges = useMemo(() => {
+    const serverFrom = toDatetimeLocalValue(flag.activeFrom);
+    const serverUntil = toDatetimeLocalValue(flag.activeUntil);
+    const serverDesc = flag.description ?? '';
+    return (
+      activeFrom !== serverFrom ||
+      activeUntil !== serverUntil ||
+      description.trim() !== serverDesc.trim()
+    );
+  }, [activeFrom, activeUntil, description, flag]);
+
+  const enableMutation = useMutation({
+    mutationFn: (nextEnabled: boolean) =>
+      updateFeatureFlag(flag.key, { enabled: nextEnabled }),
+    onSuccess: (_data, nextEnabled) => {
+      toast.success(`${flag.key} ${nextEnabled ? 'enabled' : 'disabled'}`);
+      void queryClient.invalidateQueries({ queryKey: ['feature-flags'] });
+    },
+    onError: (err) => {
+      setEnabled(flag.enabled);
+      const message =
+        err instanceof ApiError ? err.message : 'Could not update flag';
+      toast.error(message);
+    },
+  });
+
+  const scheduleMutation = useMutation({
     mutationFn: () =>
       updateFeatureFlag(flag.key, {
-        enabled,
         activeFrom: fromDatetimeLocalValue(activeFrom),
         activeUntil: fromDatetimeLocalValue(activeUntil),
         description: description.trim() || undefined,
       }),
     onSuccess: () => {
-      toast.success(`Updated ${flag.key}`);
+      toast.success(`Updated ${flag.key} schedule`);
       void queryClient.invalidateQueries({ queryKey: ['feature-flags'] });
     },
     onError: (err) => {
@@ -96,6 +121,17 @@ export function FeatureFlagRow({
     },
   });
 
+  const isSaving =
+    enableMutation.isPending ||
+    scheduleMutation.isPending ||
+    clearSchedule.isPending;
+
+  const handleToggleEnabled = () => {
+    const next = !enabled;
+    setEnabled(next);
+    enableMutation.mutate(next);
+  };
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-start justify-between gap-4">
@@ -104,6 +140,10 @@ export function FeatureFlagRow({
           {flag.description ? (
             <p className="text-sm text-muted-foreground">{flag.description}</p>
           ) : null}
+          <p className="text-xs text-muted-foreground">
+            WhatsApp and other runtimes use <strong>Effective</strong> status
+            (enabled plus schedule window), not the Enabled toggle alone.
+          </p>
         </div>
         <Badge
           className={cn(
@@ -156,7 +196,7 @@ export function FeatureFlagRow({
 
         {canManage ? (
           <div className="space-y-3 rounded-lg border border-border/60 bg-muted/20 p-4">
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <Label htmlFor={`${flag.key}-enabled`} className="text-sm">
                 Enabled
               </Label>
@@ -165,11 +205,16 @@ export function FeatureFlagRow({
                 type="button"
                 size="sm"
                 variant={enabled ? 'default' : 'outline'}
-                onClick={() => setEnabled((v) => !v)}
-                disabled={mutation.isPending}
+                onClick={handleToggleEnabled}
+                disabled={isSaving}
               >
-                {enabled ? 'On' : 'Off'}
+                {enableMutation.isPending ? 'Saving…' : enabled ? 'On' : 'Off'}
               </Button>
+              {hasScheduleChanges ? (
+                <Badge variant="outline" className="text-amber-700">
+                  Unsaved schedule changes
+                </Badge>
+              ) : null}
             </div>
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -180,7 +225,7 @@ export function FeatureFlagRow({
                   type="datetime-local"
                   value={activeFrom}
                   onChange={(e) => setActiveFrom(e.target.value)}
-                  disabled={mutation.isPending}
+                  disabled={isSaving}
                 />
               </div>
               <div className="space-y-1">
@@ -190,7 +235,7 @@ export function FeatureFlagRow({
                   type="datetime-local"
                   value={activeUntil}
                   onChange={(e) => setActiveUntil(e.target.value)}
-                  disabled={mutation.isPending}
+                  disabled={isSaving}
                 />
               </div>
             </div>
@@ -202,17 +247,17 @@ export function FeatureFlagRow({
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 maxLength={255}
-                disabled={mutation.isPending}
+                disabled={isSaving}
               />
             </div>
 
             <div className="flex flex-wrap gap-2">
               <Button
                 size="sm"
-                onClick={() => mutation.mutate()}
-                disabled={mutation.isPending}
+                onClick={() => scheduleMutation.mutate()}
+                disabled={isSaving || !hasScheduleChanges}
               >
-                {mutation.isPending ? 'Saving…' : 'Save changes'}
+                {scheduleMutation.isPending ? 'Saving…' : 'Save schedule'}
               </Button>
               <Button
                 size="sm"

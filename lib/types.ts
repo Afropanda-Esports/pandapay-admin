@@ -190,6 +190,29 @@ export interface OrderDetail extends Order {
   payments?: PaymentTimelineEntry[];
   /** @deprecated Use `payments` */
   paymentTimeline?: PaymentTimelineEntry[];
+  paymentException?: PaymentException | null;
+}
+
+export type PaymentExceptionStatus =
+  | 'REFUND_INITIATED'
+  | 'REFUND_FAILED'
+  | 'RESOLVED';
+
+export interface PaymentException {
+  id: string;
+  orderId: string;
+  userId: string;
+  expectedAmount: string;
+  receivedAmount: string;
+  excessAmount: string;
+  paystackReference: string;
+  status: PaymentExceptionStatus;
+  paystackRefundRef: string | null;
+  resolvedAt: string | null;
+  resolvedBy: string | null;
+  resolutionNote: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // ─── Products ─────────────────────────────────────────────────────────────────
