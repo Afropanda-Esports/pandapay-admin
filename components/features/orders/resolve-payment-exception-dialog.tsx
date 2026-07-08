@@ -55,7 +55,7 @@ export function ResolvePaymentExceptionDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={trigger} />
+      <DialogTrigger render={trigger as React.ReactElement} />
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Resolve overpayment exception</DialogTitle>

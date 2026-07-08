@@ -119,7 +119,7 @@ function OverpaymentExceptionAlert({
             ? ' could not be auto-refunded — process manually in Paystack.'
             : ' refund was initiated via Paystack.'}
         </p>
-        {canManage && ex.status !== 'RESOLVED' ? (
+        {canManage ? (
           <ResolvePaymentExceptionDialog
             exceptionId={ex.id}
             excessAmount={ex.excessAmount}
