@@ -1,11 +1,13 @@
 # PandaPay Admin Frontend — Implementation Guide
 
-> **Stack:** Next.js **16.2.4** (App Router) · React 19.2 · TypeScript · Tailwind v4 · Shadcn/ui · TanStack Query v5 · Recharts · React Hook Form · Zod
-> **Backend dev URL:** `http://localhost:3000` (NestJS)
+> **Stack:** Next.js **16.2.4** (App Router) · React 19.2 · TypeScript · Tailwind v4 · Shadcn/ui · TanStack Query v5 · Recharts · React Hook Form · Zod · nuqs
+> **Backend dev URL:** `http://localhost:3000` (NestJS, `pandapay-be`)
 > **Frontend dev URL:** `http://localhost:3001`
-> **Auth:** JWT stored in a cookie (`admin_token`), enforced by Next's `proxy.ts` on every protected route.
+> **Auth:** JWT lives **only** in an HttpOnly `admin_token` cookie set server-side by Next.js route handlers — it never reaches browser JS. See [§6](#6-auth--bff-architecture).
 
-**Integration status (2026-05-19):** The app shell and most pages are implemented. See **[INTEGRATION.md](./INTEGRATION.md)** for which API calls succeed vs return 404. Canonical contract: [pandapay-be/INTEGRATION.md](../../pandapay-be/INTEGRATION.md).
+**Integration status (2026-07-20):** The app shell and every backend module *except Discount Codes* are fully wired. Canonical live-status references: [INTEGRATION.md](./INTEGRATION.md) and [ROLES.md](./ROLES.md) in this repo, and `pandapay-be/AGENTS.md`'s "Admin ↔ backend" table (also currently out of date — see note below).
+
+> **This document was significantly stale as of 2026-07-19** (described a client-side `js-cookie` auth pattern and only 5 of 13 admin modules). It was rewritten 2026-07-20 against the actual source in this repo and the sibling `pandapay-be` repo. If you find it drifting again, prefer reading the real files over trusting prose — links are provided throughout.
 
 ---
 
@@ -16,1461 +18,480 @@
 3. [Folder Structure](#3-folder-structure)
 4. [Complete API Reference](#4-complete-api-reference)
 5. [TypeScript Types](#5-typescript-types)
-6. [API Client Layer](#6-api-client-layer)
-7. [Auth — Hook + Proxy (Next 16)](#7-auth--hook--proxy-next-16)
-8. [Providers & Root Layout](#8-providers--root-layout)
-9. [Admin Shell Layout (Sidebar + Header)](#9-admin-shell-layout-sidebar--header)
-10. [Page Implementation Guide](#10-page-implementation-guide)
-11. [Charts — Recommendation & Setup](#11-charts--recommendation--setup)
-12. [Reusable Components](#12-reusable-components)
-13. [Form Patterns](#13-form-patterns)
-14. [Error & Loading Patterns](#14-error--loading-patterns)
-15. [Backend CORS Change Required](#15-backend-cors-change-required)
-16. [Deployment (Vercel)](#16-deployment-vercel)
+6. [Auth — BFF Architecture](#6-auth--bff-architecture)
+7. [Providers & Root Layout](#7-providers--root-layout)
+8. [Admin Shell Layout (Sidebar + Header)](#8-admin-shell-layout-sidebar--header)
+9. [Page Inventory](#9-page-inventory)
+10. [Charts](#10-charts)
+11. [Reusable Components](#11-reusable-components)
+12. [Form Patterns](#12-form-patterns)
+13. [Error & Loading Patterns](#13-error--loading-patterns)
+14. [Backend CORS](#14-backend-cors)
+15. [Deployment (Vercel)](#15-deployment-vercel)
+16. [Next Up — Discount Codes Admin UI](#16-next-up--discount-codes-admin-ui)
 
 ---
 
 ## 1. Codebase Status
 
-**Build state:** Phases 0–8 from [implementation-plan.md](./implementation-plan.md) are **done** — auth, dashboard, products, orders, users, audit, pricing/admins UI shells, and shared components all exist in the repo.
+**Build state:** All 12 backend admin modules are now wired end-to-end (list/detail pages, mutations, RBAC-gated actions), including Discount Codes (`app/(admin)/discount-codes/page.tsx`, built per §16 below).
 
 | Concern | Status |
 |---|---|
 | Next.js | **16.2.4** (App Router) |
 | React | **19.2.4** |
-| TanStack Query, RHF, Zod, Recharts, nuqs, date-fns, js-cookie | **Installed** (`package.json`) |
-| Shadcn/ui primitives | **Installed** under `components/ui/` |
-| API clients | `lib/api/*.ts` — see [INTEGRATION.md](./INTEGRATION.md) for BE coverage |
-| Routes | `app/login`, `app/(admin)/*`, `app/change-password` |
-| Theme | [app/globals.css](../app/globals.css) — light + dark; Satoshi `@font-face` optional |
-| Dev port | **3001** (`pnpm dev`) |
+| TanStack Query, RHF, Zod, Recharts, nuqs, date-fns | Installed (`package.json`) |
+| Shadcn/ui primitives | Installed under `components/ui/` (style `base-nova`) |
+| API clients | `lib/api/*.ts` — one file per backend module, all built on `apiFetch` in `lib/api/client.ts` |
+| Auth | HttpOnly-cookie BFF — see [§6](#6-auth--bff-architecture) |
+| Dev port | **3001** (`pnpm dev`, Turbopack) |
+| Satoshi font | `.otf` files present at `app/assets/satoshi/` but **not yet wired** via `next/font/local` in `app/layout.tsx` — theme currently renders in fallback `sans-serif` |
+| Automated tests | **None** — no test runner installed in this repo |
 
-### Backend gaps (admin UI ahead of API)
+### Backend ↔ frontend parity
 
-These pages render but call **unimplemented** backend routes: `/pricing`, `/admins`, `/change-password`, user wallet credit/transactions, product pricing PATCH. Details: [INTEGRATION.md](./INTEGRATION.md).
+Every route in every controller under `pandapay-be/src/admin/controllers/` is now called from `panda-admin/lib/api/*.ts`, including `discount-codes-admin.controller.ts` (`lib/api/discount-codes.ts`).
 
-### Missing assets (optional)
-
-Satoshi `.otf` files at `app/assets/satoshi/` are still optional — theme falls back to `sans-serif` without them.
+`pandapay-be/AGENTS.md`'s own "Admin ↔ backend" table is itself out of date — it lists `change-password`, `pricing/*`, and `admins/*` as "missing," but all three have been implemented on both sides for some time, and it never mentions discount-codes at all. Don't trust that table without cross-checking; that's out of scope to fix from this repo since it lives in `pandapay-be`.
 
 ### Next 16 breaking changes you must know
 
 These differ from the Next 14/15 patterns most LLMs and tutorials assume:
 
-1. **`middleware.ts` → `proxy.ts`** at project root. Function exported is `proxy`, not `middleware`. Same `config.matcher` shape. (Old `middleware.ts` still works but is deprecated.) See [§7.2](#72-proxy-nexts-auth-guard).
-2. **Dynamic route `params` and `searchParams` are `Promise<...>`.** Must `await` (server component) or `use()` (client component). See [§10.4](#104-user-detail-usersid) for the canonical pattern.
-3. **`unstable_instant`** export from a route enables instant navigation — Suspense alone is not enough. Worth adding to `/orders` and `/users` list pages once they ship.
+1. **`middleware.ts` → `proxy.ts`** at project root. Exported function is `proxy`, not `middleware`. Same `config.matcher` shape. See [§6.2](#62-proxy-the-route-guard).
+2. **Dynamic route `params` and `searchParams` are `Promise<...>`.** Must `await` (server component) or `use()` (client component).
+3. **`app/(admin)/error.tsx` receives `unstable_retry`**, not the old `reset` prop.
 
-Before starting any phase, skim relevant guides in `node_modules/next/dist/docs/01-app/` if your work touches routing, caching, or proxy.
+Before touching routing, caching, or the proxy, skim `node_modules/next/dist/docs/01-app/`.
 
 ---
 
 ## 2. Environment Variables
 
-Create `.env.local` at project root:
-
 ```bash
 # .env.local
-NEXT_PUBLIC_API_URL=http://localhost:3000
-# Production:
-# NEXT_PUBLIC_API_URL=https://api.pandapay.io
+API_URL=http://localhost:3000
+# NEXT_PUBLIC_API_URL is a legacy fallback — lib/env.ts prefers API_URL if both are set
 ```
 
-**Never** put JWT secrets or admin credentials in `NEXT_PUBLIC_*`. The token lives in a client-side cookie only.
+`lib/env.ts`'s `assertAdminEnv()` runs at `next.config.ts` load time and **fails the build** if neither var is set or the value doesn't parse as a URL.
 
-`package.json` `dev` script must run on **port 3001** so backend (3000) and frontend (3001) don't collide:
+**Never** put JWT secrets or admin credentials in `NEXT_PUBLIC_*` — nothing token-related needs to be public; the token lives server-side only (see [§6](#6-auth--bff-architecture)).
 
+`package.json`'s `dev` script already runs on port 3001:
 ```json
-"scripts": {
-  "dev": "next dev --port 3001"
-}
+"scripts": { "dev": "next dev --port 3001 --turbopack" }
 ```
 
 ---
 
 ## 3. Folder Structure
 
-The `@/*` import alias resolves to project root (`tsconfig.json` → `"paths": { "@/*": ["./*"] }`), so all imports below are written `@/lib/...`, `@/components/...`, etc.
+The `@/*` import alias resolves to project root.
 
 ```
 panda-admin/
 ├── app/
 │   ├── layout.tsx                   # Root layout — Providers, Sonner toaster
-│   ├── page.tsx                     # Redirect to /dashboard (or /login)
-│   ├── globals.css                  # Panda theme (Tailwind v4 @theme + light/dark)
-│   ├── assets/
-│   │   └── satoshi/                 # Satoshi-Regular.otf etc. (drop in)
-│   ├── login/
-│   │   └── page.tsx                 # Login form
-│   └── (admin)/                     # Route group — all pages require auth
-│       ├── layout.tsx               # Admin shell (sidebar + topbar)
-│       ├── dashboard/
-│       │   └── page.tsx
-│       ├── users/
-│       │   ├── page.tsx             # User list + search
-│       │   └── [id]/
-│       │       └── page.tsx         # User detail
-│       ├── orders/
-│       │   ├── page.tsx             # Order list + filters
-│       │   └── [id]/
-│       │       └── page.tsx         # Order detail
-│       ├── products/
-│       │   ├── page.tsx             # Product list + create
-│       │   └── [id]/
-│       │       └── page.tsx         # Product detail + voucher upload
-│       └── audit/
-│           └── page.tsx             # Audit log
+│   ├── page.tsx                     # Redirect to /dashboard
+│   ├── globals.css                  # Panda theme (Tailwind v4 @theme, light/dark)
+│   ├── sample.css                   # ⚠ orphan — not imported anywhere, safe to delete
+│   ├── assets/satoshi/              # Satoshi .otf files (present, not yet wired)
+│   ├── login/page.tsx
+│   ├── change-password/page.tsx
+│   ├── api/                         # BFF server routes — see §6
+│   │   ├── auth/login/route.ts
+│   │   ├── auth/logout/route.ts
+│   │   └── backend/[...path]/route.ts   # generic authenticated reverse proxy
+│   └── (admin)/                     # Route group — every page requires auth
+│       ├── layout.tsx               # Sidebar + Header shell, redirects on mustChangePassword
+│       ├── error.tsx                # Next 16: unstable_retry, not reset
+│       ├── dashboard/page.tsx
+│       ├── users/page.tsx, [id]/page.tsx
+│       ├── orders/page.tsx, [id]/page.tsx
+│       ├── transactions/page.tsx
+│       ├── products/page.tsx, [id]/page.tsx
+│       ├── pricing/page.tsx
+│       ├── fraud/page.tsx
+│       ├── payment-exceptions/page.tsx
+│       ├── feature-flags/page.tsx
+│       ├── audit/page.tsx
+│       └── admins/page.tsx          # SUPER_ADMIN only (gated in proxy.ts too)
 │
 ├── lib/
-│   ├── types.ts                     # All shared TS interfaces + enums
-│   ├── utils.ts                     # cn() helper (added by shadcn init)
+│   ├── types.ts                     # Single source of truth for all shared types/enums
+│   ├── permissions.ts                # AdminPermission enum, role→permission map
+│   ├── env.ts                        # assertAdminEnv() build-time guard
+│   ├── auth/session.ts               # Cookie name constants, cookie option builders
+│   ├── utils.ts                      # cn() helper
 │   └── api/
-│       ├── client.ts                # Base fetch wrapper (auth header, error handling)
-│       ├── auth.ts
-│       ├── stats.ts
-│       ├── users.ts
-│       ├── orders.ts
-│       ├── products.ts
-│       └── audit.ts
+│       ├── client.ts                 # apiFetch<T> — see §6.1
+│       ├── auth.ts, me.ts, stats.ts
+│       ├── users.ts, orders.ts, products.ts, pricing.ts
+│       ├── admins.ts, audit.ts, fraud.ts
+│       ├── payment-exceptions.ts, feature-flags.ts
+│       └── (discount-codes.ts does not exist yet — §16)
 │
 ├── hooks/
-│   ├── use-auth.ts                  # Token read/write/logout
-│   └── use-debounce.ts              # Search input debounce (or import from usehooks-ts)
+│   ├── use-auth.ts                   # logout(): clears React Query cache, redirects
+│   ├── use-me.ts                     # cached current-admin profile query (5 min staleTime)
+│   └── use-permissions.ts            # derives role/labels/can() from useMe
 │
 ├── components/
-│   ├── ui/                          # Shadcn primitives (added by `shadcn add ...`)
+│   ├── ui/                           # Shadcn primitives (style: base-nova)
 │   ├── layout/
-│   │   ├── providers.tsx            # QueryClientProvider + devtools
-│   │   ├── sidebar.tsx
-│   │   ├── header.tsx
-│   │   └── nav-items.ts             # Sidebar link config
-│   ├── shared/
-│   │   ├── data-table.tsx           # Generic paginated table wrapper
-│   │   ├── pagination-controls.tsx
-│   │   ├── status-badge.tsx         # Order status → colored badge
-│   │   ├── stat-card.tsx            # Dashboard metric card
-│   │   ├── page-header.tsx          # Title + breadcrumb + action slot
-│   │   ├── empty-state.tsx
-│   │   └── confirm-dialog.tsx       # Generic "Are you sure?" dialog
-│   └── features/
-│       ├── dashboard/
-│       │   ├── orders-chart.tsx
-│       │   └── revenue-chart.tsx
-│       ├── orders/
-│       │   └── order-filters.tsx
-│       ├── products/
-│       │   ├── create-product-dialog.tsx
-│       │   └── upload-vouchers-dialog.tsx
-│       └── users/
-│           └── pin-status-card.tsx
+│   │   ├── providers.tsx
+│   │   ├── sidebar.tsx, header.tsx
+│   │   └── nav-items.ts              # §8
+│   ├── shared/                       # Generic: data-table, pagination, status-badge,
+│   │                                 #   stat-card, page-header, empty-state, confirm-dialog
+│   ├── orders/payment-timeline.tsx   # ⚠ lives outside features/orders/ — minor inconsistency
+│   └── features/<domain>/            # dashboard, orders, products, users, pricing, fraud,
+│                                     #   payment-exceptions, feature-flags, admins
 │
-├── proxy.ts                         # ← Next 16: was middleware.ts
-└── components.json                  # Shadcn config (created by `shadcn init`)
+├── proxy.ts                          # Next 16 route guard — see §6.2
+└── components.json                   # Shadcn config
 ```
 
-> **File naming:** kebab-case for non-component files and component files alike — matches Shadcn's own conventions. Existing `app/layout.tsx` etc. stays as-is (Next requires those names).
+> **File naming:** kebab-case for non-component and component files alike.
 
 ---
 
 ## 4. Complete API Reference
 
-All routes except login require `Authorization: Bearer <token>`.
+All routes except `POST /admin/auth/login` require the `admin_token` cookie (attached server-side as `Authorization: Bearer <token>` by `app/api/backend/[...path]/route.ts`).
 
-> **Availability:** Not every endpoint below exists on pandapay-be yet. For a live matrix (implemented vs 404), use [INTEGRATION.md](./INTEGRATION.md) and [pandapay-be/INTEGRATION.md](../../pandapay-be/INTEGRATION.md). This section documents **intended** contracts for frontend types and future BE work.
+> **Decimal gotcha:** TypeORM serializes `DECIMAL` columns as **strings**. `Order.amount`, `Product.priceUsd`/`manualPriceNgn`/`snapshotNgnPrice`, `DiscountCode.discountValue`, etc. are all `string`. `Stats.revenue.*` is the one exception — computed server-side and returned as `number`.
 
-> **Decimal gotcha:** TypeORM serializes `DECIMAL` database columns as **strings** in JSON — so `amount` and `denomination` always come back as `"5000.00"`, not `5000`. Parse with `parseFloat()` before doing arithmetic or display formatting.
+### 4.1 Auth & session
 
----
+| Route | Frontend client |
+|---|---|
+| `POST /admin/auth/login` | `lib/api/auth.ts: login()` — actually calls `/api/auth/login` (BFF), which forwards to this and sets cookies |
+| `GET /admin/me` | `lib/api/me.ts: getMe()` |
+| `POST /admin/me/change-password` | `lib/api/me.ts: changePassword()` |
 
-### 4.1 Auth
-
-```
-POST /admin/auth/login
-```
-
-**Request body:**
-```json
-{
-  "email": "admin@pandapay.io",
-  "password": "yourpassword"
-}
-```
-
-**Response `200`:**
-```json
-{
-  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "email": "admin@pandapay.io",
-  "display_name": "PandaPay Admin",
-  "role": "SUPER_ADMIN",
-  "must_change_password": false
-}
-```
-
-**Response `401`:**
-```json
-{
-  "statusCode": 401,
-  "message": "Invalid credentials",
-  "timestamp": "2026-05-06T10:00:00.000Z",
-  "path": "/admin/auth/login"
-}
-```
-
----
+Login response shape (`LoginResponse` in `lib/types.ts`): `{ must_change_password, role?, email?, display_name? }`. The `access_token` itself is consumed by the BFF route handler and never returned to the browser.
 
 ### 4.2 Stats
 
-```
-GET /admin/stats
-Authorization: Bearer <token>
-```
-
-**Response `200`:**
-```json
-{
-  "users": {
-    "total": 142,
-    "newLast7Days": 18
-  },
-  "orders": {
-    "total": 890,
-    "pending": 5,
-    "paid": 2,
-    "fulfilled": 820,
-    "failed": 15,
-    "expired": 48
-  },
-  "revenue": {
-    "totalNgn": 4450000.00,
-    "last7DaysNgn": 125000.00
-  },
-  "vouchers": {
-    "total": 500,
-    "available": 230,
-    "used": 270
-  }
-}
-```
-
-> `revenue` values are JavaScript `number` (float), not strings — they are computed in service code, not read from a decimal column directly.
-
----
+`GET /admin/stats` → `lib/api/stats.ts: getStats()`. Polled every 30s on the dashboard. Returns `Stats` (see §5) — `revenue` values are `number`, everything money-like elsewhere is `string`.
 
 ### 4.3 Users
 
-#### List users
-```
-GET /admin/users?page=1&limit=20&search=081
-Authorization: Bearer <token>
-```
+| Route | Client (`lib/api/users.ts`) |
+|---|---|
+| `GET /admin/users?page&limit&search` | `getUsers()` |
+| `GET /admin/users/directory?limit` | `getUserDirectory()` |
+| `GET /admin/users/:id` | `getUser()` |
+| `PATCH /admin/users/:id/unlock-pin` | `unlockPin()` |
+| `GET /admin/users/:id/payments?page&limit` | `getUserPayments()` |
 
-**Query params:**
-| Param | Type | Default | Notes |
-|-------|------|---------|-------|
-| `page` | integer | `1` | |
-| `limit` | integer | `20` | max `100` |
-| `search` | string | — | ILIKE match on `whatsappNumber` or `displayName` |
-
-**Response `200`:**
-```json
-{
-  "data": [
-    {
-      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-      "whatsappNumber": "2348012345678",
-      "displayName": "Emeka Obi",
-      "createdAt": "2026-04-01T08:22:10.000Z",
-      "walletBalance": 12500
-    }
-  ],
-  "total": 142,
-  "page": 1,
-  "limit": 20
-}
-```
-
-> `walletBalance` is a JavaScript `number` (float), not a string. Computed in the service from the ledger (`SUM(CREDIT) - SUM(DEBIT)`).
-
-#### Get user detail
-```
-GET /admin/users/:id
-Authorization: Bearer <token>
-```
-
-**Response `200`:**
-```json
-{
-  "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "whatsappNumber": "2348012345678",
-  "displayName": "Emeka Obi",
-  "createdAt": "2026-04-01T08:22:10.000Z",
-  "walletBalance": 12500,
-  "pinStatus": {
-    "failedAttempts": 2,
-    "isLocked": false,
-    "lockedUntil": null
-  },
-  "recentOrders": [
-    {
-      "id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
-      "userId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-      "productId": "d4e5f6a7-b8c9-0123-defa-234567890123",
-      "amount": "5000.00",
-      "paymentMode": "WALLET",
-      "status": "FULFILLED",
-      "paystackReference": null,
-      "expiresAt": null,
-      "createdAt": "2026-05-01T11:30:00.000Z",
-      "product": {
-        "id": "d4e5f6a7-b8c9-0123-defa-234567890123",
-        "name": "Steam Gift Card",
-        "category": "GIFT_CARD",
-        "denomination": "5000.00",
-        "currency": "NGN",
-        "isAvailable": true
-      }
-    }
-  ]
-}
-```
-
-**Locked user example** (`pinStatus` when locked):
-```json
-{
-  "failedAttempts": 5,
-  "isLocked": true,
-  "lockedUntil": "2026-05-06T11:45:00.000Z"
-}
-```
-
-#### Unlock PIN
-```
-PATCH /admin/users/:id/unlock-pin
-Authorization: Bearer <token>
-```
-
-**Response `200`:** `{ "success": true }`
-
----
+`UserDetail` includes `pinStatus`, `recentOrders`, and `virtualAccount` (Paystack DVA info, nullable). There is **no wallet balance concept** in the current domain model — the `wallet` module on the backend is legacy/dead in the live checkout path. `PaymentMethod` values are `DEDICATED_NUBAN | BANK_TRANSFER | WALLET | REFUND | CRYPTO_USDC`.
 
 ### 4.4 Orders
 
-#### List orders
-```
-GET /admin/orders?page=1&limit=20&status=FULFILLED&from=2026-05-01&to=2026-05-06
-Authorization: Bearer <token>
-```
+| Route | Client (`lib/api/orders.ts`) |
+|---|---|
+| `GET /admin/orders?page&limit&status&userId&from&to` | `getOrders()` |
+| `GET /admin/orders/:id` | `getOrder()` |
+| `POST /admin/orders/:id/resend` | `resendOrder()` |
+| `POST /admin/orders/:id/fulfill` | `fulfillOrder()` |
+| `POST /admin/orders/:id/refund` | `refundOrder()` |
+| `POST /admin/orders/:id/retry` | `retryOrder()` |
+| `POST /admin/orders/purchase` | `createPurchase()` |
 
-**Query params:**
-| Param | Type | Notes |
-|-------|------|-------|
-| `page` | integer | default `1` |
-| `limit` | integer | default `20`, max `100` |
-| `status` | string | `PENDING \| PAID \| FULFILLED \| EXPIRED \| FAILED` |
-| `userId` | UUID | exact match |
-| `from` / `to` | ISO date | e.g. `2026-05-01` |
+`OrderStatus` = `PENDING | PAID | FULFILLED | EXPIRED | FAILED`. `PaymentMode` = `WALLET | DIRECT_TRANSFER | CRYPTO` (the `WALLET` mode value still exists in the enum for historical orders even though the wallet module itself is dead for new checkouts — don't assume it means an active feature). `OrderDetail.paymentTimeline` is `@deprecated`, use `.payments`.
 
-**Response `200`:** `PaginatedResponse<Order>` — see §5.
+### 4.5 Products & pricing
 
-#### Get order detail
-```
-GET /admin/orders/:id
-```
+| Route | Client |
+|---|---|
+| `GET /admin/products?category` | `products.ts: getProducts()` |
+| `GET /admin/products/:id` | `getProduct()` |
+| `POST /admin/products` | `createProduct()` |
+| `PATCH /admin/products/:id` | `updateProduct()` |
+| `PATCH /admin/products/:id/pricing` | `updateProductPricing()` — SUPER_ADMIN only server-side |
+| `POST /admin/products/:id/vouchers` | `uploadVouchers()` (max 500 codes/request, AES-256-GCM at rest) |
+| `GET /admin/products/:id/vouchers/stats` | `getVoucherStats()` |
+| `GET /admin/pricing/rate` | `pricing.ts: getCurrentRate()` |
+| `GET /admin/pricing/oracle` | `getOracleRate()` |
+| `GET /admin/pricing/rate/history?limit` | `getRateHistory()` |
+| `POST /admin/pricing/rate` | `setRate()` — SUPER_ADMIN only |
+| `POST /admin/pricing/recompute` | `recomputeAll()` — SUPER_ADMIN only |
 
-Returns `OrderDetail` (`Order` + `voucherAssigned: boolean` + `voucherIsUsed: boolean`).
+`PricingMode` = `GLOBAL_FX | MANUAL_NGN`. `Product.snapshotNgnPrice` is the price actually charged; it's recomputed whenever the global rate changes (`GLOBAL_FX` products) or on manual pricing PATCH.
 
-> `voucherAssigned: true, voucherIsUsed: false` should never happen in normal flow — flag as fulfillment inconsistency in the UI.
+### 4.6 Admins (team management)
 
-#### Resend voucher
-```
-POST /admin/orders/:id/resend
-```
+| Route | Client (`lib/api/admins.ts`) |
+|---|---|
+| `GET /admin/admins/directory` | `getAdminDirectory()` |
+| `GET /admin/admins` | `getAdmins()` |
+| `POST /admin/admins` | `createAdmin()` — SUPER_ADMIN only |
+| `PATCH /admin/admins/:id` | `updateAdmin()` — SUPER_ADMIN only |
+| `POST /admin/admins/:id/reset-password` | `resetAdminPassword()` — SUPER_ADMIN only |
 
-No body. Returns `{ "success": true }`. Only works on `FULFILLED` orders with a voucher assigned.
+### 4.7 Fraud, payment exceptions, feature flags, audit
 
----
+| Route | Client |
+|---|---|
+| `GET /admin/fraud-events?page&limit` | `fraud.ts: listFraudEvents()` |
+| `PATCH /admin/fraud-events/:id/approve` | `approveFraudEvent()` |
+| `PATCH /admin/fraud-events/:id/reject` | `rejectFraudEvent()` |
+| `GET /admin/payment-exceptions?page&limit&status` | `payment-exceptions.ts: listPaymentExceptions()` |
+| `POST /admin/payment-exceptions/:id/resolve` | `resolvePaymentException()` |
+| `GET /admin/feature-flags` | `feature-flags.ts: getFeatureFlags()` |
+| `PATCH /admin/feature-flags/:key` | `updateFeatureFlag()` — SUPER_ADMIN only |
+| `GET /admin/audit-logs?page&limit&actor&action&from&to` | `audit.ts: getAuditLogs()` |
 
-### 4.5 Products
+`FeatureFlag` has a time-boxed activation window (`activeFrom`/`activeUntil`); `isFeatureFlagEffective()` in `feature-flags.ts` mirrors the backend's window logic client-side for UI badges only — the backend is still the enforcement point.
 
-#### List products
-```
-GET /admin/products
-GET /admin/products?category=GIFT_CARD
-```
+### 4.8 Discount codes
 
-Returns `ProductWithStats[]` — **bare array**, not paginated. Includes unavailable products.
+| Route | Client (`lib/api/discount-codes.ts`) |
+|---|---|
+| `GET /admin/discount-codes?page&limit&status&productId&category` | `listDiscountCodes()` |
+| `POST /admin/discount-codes/generate` | `generateDiscountCodes()` — SUPER_ADMIN only |
+| `PATCH /admin/discount-codes/:id/revoke` | `revokeDiscountCode()` — SUPER_ADMIN only |
 
-#### Get product detail
-```
-GET /admin/products/:id
-```
-Returns one `ProductWithStats`.
-
-#### Create product
-```
-POST /admin/products
-Content-Type: application/json
-
-{
-  "name": "Xbox Game Pass 1 Month",
-  "category": "GIFT_CARD",
-  "denomination": 7500,
-  "currency": "NGN"
-}
-```
-
-> `currency` defaults to `"NGN"` if omitted.
-
-**Response `201`:** Product object **without** `voucherStats`. Refetch if you need stats.
-
-#### Update product
-```
-PATCH /admin/products/:id
-
-{ "isAvailable": false }
-{ "name": "...", "denomination": 5000, "isAvailable": true }
-```
-
-All fields optional. Response: full product (no `voucherStats`).
-
-#### Upload vouchers
-```
-POST /admin/products/:id/vouchers
-
-{ "codes": ["STEAM-XXXX-YYYY-ZZZZ", "..."] }
-```
-
-> Max 500 codes per request. Server encrypts (AES-256-GCM) before storing — never log plaintext after sending.
-
-**Response `200`:** `{ "inserted": 3 }`
-
-#### Get voucher stats
-```
-GET /admin/products/:id/vouchers/stats
-```
-
-Response: `{ productId, total, available, used }`.
-
----
-
-### 4.6 Audit Logs
-
-```
-GET /admin/audit-logs?page=1&limit=20&action=WALLET_CREDIT&from=2026-05-01
-```
-
-**Query params:** `page`, `limit`, `actor` (userId UUID, `"system"`, or `"admin"`), `action`, `from`, `to`.
-
-**Action values and metadata shapes:**
-
-| Action | Actor | Metadata fields |
-|--------|-------|-----------------|
-| `WALLET_CREDIT` | userId | `walletId`, `amount`, `reference` |
-| `WALLET_DEBIT` | userId | `walletId`, `amount`, `orderId` |
-| `ORDER_FULFILLED` | userId | `orderId`, `productId` |
-| `ORDER_FAILED` | userId | `orderId` |
-| `ORDER_EXPIRED` | `"system"` | `orderId` |
-| `ADMIN_RESEND` | `"admin"` | `orderId`, `actor` |
-| `USER_CREATED` | `"system"` | `userId`, `whatsappNumber` |
-| `PIN_SET` | userId | `userId` |
-| `PIN_LOCKED` | userId | `userId`, `lockedUntil` |
-| `PIN_UNLOCKED` | `"admin"` | `userId` |
+`DiscountCodeStatus` is derived client-side (`deriveDiscountCodeStatus()` in `components/features/discount-codes/discount-status-badge.tsx`) since the backend has no `status` column — see [§16](#16-next-up--discount-codes-admin-ui) for the exact precedence and full contract this was built from.
 
 ---
 
 ## 5. TypeScript Types
 
-[lib/types.ts](../lib/types.ts) — single source of truth.
+[lib/types.ts](../lib/types.ts) is the single source of truth — **read it directly rather than trusting a copy here**, it has drifted from documentation before. Key things worth calling out explicitly:
 
-```ts
-// ─── Enums ────────────────────────────────────────────────────────────────────
-
-export type OrderStatus = 'PENDING' | 'PAID' | 'FULFILLED' | 'EXPIRED' | 'FAILED';
-export type PaymentMode = 'WALLET' | 'DIRECT_TRANSFER';
-export type ProductCategory = 'GIFT_CARD' | 'GAME_TOP_UP' | 'AIRTIME';
-export type AuditAction =
-  | 'WALLET_CREDIT'
-  | 'WALLET_DEBIT'
-  | 'ORDER_FULFILLED'
-  | 'ORDER_FAILED'
-  | 'ORDER_EXPIRED'
-  | 'ADMIN_RESEND'
-  | 'USER_CREATED'
-  | 'PIN_SET'
-  | 'PIN_LOCKED'
-  | 'PIN_UNLOCKED';
-
-// ─── Pagination ───────────────────────────────────────────────────────────────
-
-export interface PaginatedResponse<T> {
-  data: T[];
-  total: number;
-  page: number;
-  limit: number;
-}
-
-// ─── Stats ────────────────────────────────────────────────────────────────────
-
-export interface Stats {
-  users: { total: number; newLast7Days: number };
-  orders: {
-    total: number;
-    pending: number;
-    paid: number;
-    fulfilled: number;
-    failed: number;
-    expired: number;
-  };
-  revenue: { totalNgn: number; last7DaysNgn: number };
-  vouchers: { total: number; available: number; used: number };
-}
-
-// ─── Users ────────────────────────────────────────────────────────────────────
-
-export interface UserListItem {
-  id: string;
-  whatsappNumber: string;
-  displayName: string | null;
-  createdAt: string;
-  walletBalance: number;
-}
-
-export interface UserDetail extends UserListItem {
-  pinStatus: {
-    failedAttempts: number;
-    isLocked: boolean;
-    lockedUntil: string | null;
-  };
-  recentOrders: Order[];
-}
-
-// ─── Orders ───────────────────────────────────────────────────────────────────
-
-export interface Order {
-  id: string;
-  userId: string;
-  productId: string;
-  amount: string;            // DECIMAL — parseFloat before math
-  paymentMode: PaymentMode;
-  status: OrderStatus;
-  paystackReference: string | null;
-  expiresAt: string | null;
-  createdAt: string;
-  product?: ProductWithStats;
-  user?: UserListItem;
-}
-
-export interface OrderDetail extends Order {
-  voucherAssigned: boolean;
-  voucherIsUsed: boolean;
-}
-
-// ─── Products ─────────────────────────────────────────────────────────────────
-
-export interface VoucherStats {
-  total: number;
-  available: number;
-  used: number;
-}
-
-export interface ProductWithStats {
-  id: string;
-  name: string;
-  category: ProductCategory;
-  denomination: string;       // DECIMAL — parseFloat before math
-  currency: string;
-  isAvailable: boolean;
-  voucherStats: VoucherStats;
-}
-
-// ─── Audit ────────────────────────────────────────────────────────────────────
-
-export interface AuditLog {
-  id: string;
-  actor: string;
-  action: AuditAction;
-  metadata: Record<string, unknown>;
-  createdAt: string;
-}
-```
+- `AuditAction` has grown to 25+ values (admin actions, product/pricing actions, fraud, crypto, feature flags) — don't assume the audit log only covers wallet/order events.
+- `PaymentMethod` (payments a user made) and `PaymentMode` (mode an order was placed in) are **different types** — easy to confuse.
+- Money fields are `string` almost everywhere except `Stats.revenue.*`.
+- There is currently **no `DiscountCode` type** — it needs to be added as part of [§16](#16-next-up--discount-codes-admin-ui).
 
 ---
 
-## 6. API Client Layer
+## 6. Auth — BFF Architecture
 
-### 6.1 Base Client — [lib/api/client.ts](../lib/api/client.ts)
+This is the part earlier versions of this doc got fundamentally wrong (they described a client-side `js-cookie`/`NEXT_PUBLIC_API_URL` pattern). The real architecture:
 
-```ts
-import Cookies from 'js-cookie';
+1. Login form → `lib/api/auth.ts: login()` → `POST /api/auth/login` (a **Next.js server route**, not the NestJS backend directly).
+2. That route (`app/api/auth/login/route.ts`) calls `POST {API_URL}/admin/auth/login` on the real backend, then sets `admin_token` (HttpOnly, `sameSite: strict`, `secure` in prod, 24h max-age) and `admin_role` cookies via `lib/auth/session.ts`'s option builders. The JWT never reaches browser JavaScript.
+3. Every subsequent client fetch goes through `lib/api/client.ts: apiFetch()`, which calls `/api/backend/<path>` same-origin.
+4. `app/api/backend/[...path]/route.ts` — a catch-all reverse proxy — reads the `admin_token` cookie server-side, attaches `Authorization: Bearer <token>`, forwards to the NestJS backend, and streams the response back. A 401 from upstream clears both cookies automatically.
+5. `hooks/use-auth.ts: useAuth().logout()` calls `POST /api/auth/logout` (clears cookies), clears the React Query cache, and redirects to `/login`.
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+### 6.1 Client-side RBAC is not a security boundary
 
-export class ApiError extends Error {
-  constructor(public readonly status: number, message: string) {
-    super(message);
-    this.name = 'ApiError';
-  }
-}
+`lib/permissions.ts` + `hooks/use-permissions.ts` + `components/shared/require-permission.tsx` hide/disable UI for the `ADMIN` ("Manager") role vs `SUPER_ADMIN`. This is UX only — every SUPER_ADMIN-only mutation is independently re-checked by `SuperAdminGuard` on the backend and returns 403 if bypassed.
 
-export async function apiFetch<T>(
-  path: string,
-  options: RequestInit = {},
-): Promise<T> {
-  const token = Cookies.get('admin_token');
+### 6.2 Proxy — the route guard
 
-  const res = await fetch(`${BASE_URL}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(options.headers ?? {}),
-    },
-  });
+`proxy.ts` (project root, Next 16's renamed `middleware.ts` — exported function is `proxy`, not `middleware`) does a **cookie-presence check only**:
 
-  // Token expired or invalid — clear cookie, let proxy redirect on next nav
-  if (res.status === 401) {
-    Cookies.remove('admin_token');
-    if (typeof window !== 'undefined') window.location.href = '/login';
-    throw new ApiError(401, 'Session expired');
-  }
+- `PROTECTED_PATHS` covers every `(admin)` route plus `/change-password`.
+- `SUPER_ADMIN_ONLY_PATHS = ['/admins']` — redirects non-SUPER_ADMIN roles to `/dashboard` based on the `admin_role` cookie.
+- A forged or expired token still passes this check and gets rejected by the backend on the next API call (`apiFetch` handles the resulting 401).
 
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new ApiError(res.status, (body as any).message ?? 'Request failed');
-  }
-
-  if (res.status === 204) return undefined as T;
-  return res.json() as Promise<T>;
-}
-```
-
-### 6.2 Auth — [lib/api/auth.ts](../lib/api/auth.ts)
-
-```ts
-import { apiFetch } from './client';
-
-export const login = (email: string, password: string) =>
-  apiFetch<{ access_token: string }>('/admin/auth/login', {
-    method: 'POST',
-    body: JSON.stringify({ email, password }),
-  });
-```
-
-### 6.3 Stats — [lib/api/stats.ts](../lib/api/stats.ts)
-
-```ts
-import { apiFetch } from './client';
-import type { Stats } from '@/lib/types';
-
-export const getStats = () => apiFetch<Stats>('/admin/stats');
-```
-
-### 6.4 Users — [lib/api/users.ts](../lib/api/users.ts)
-
-```ts
-import { apiFetch } from './client';
-import type { PaginatedResponse, UserListItem, UserDetail } from '@/lib/types';
-
-interface GetUsersParams {
-  page?: number;
-  limit?: number;
-  search?: string;
-}
-
-export const getUsers = ({ page = 1, limit = 20, search }: GetUsersParams = {}) => {
-  const q = new URLSearchParams({ page: String(page), limit: String(limit) });
-  if (search) q.set('search', search);
-  return apiFetch<PaginatedResponse<UserListItem>>(`/admin/users?${q}`);
-};
-
-export const getUser = (id: string) => apiFetch<UserDetail>(`/admin/users/${id}`);
-
-export const unlockPin = (id: string) =>
-  apiFetch<{ success: boolean }>(`/admin/users/${id}/unlock-pin`, {
-    method: 'PATCH',
-  });
-```
-
-### 6.5 Orders — [lib/api/orders.ts](../lib/api/orders.ts)
-
-```ts
-import { apiFetch } from './client';
-import type { PaginatedResponse, Order, OrderDetail, OrderStatus } from '@/lib/types';
-
-interface GetOrdersParams {
-  page?: number;
-  limit?: number;
-  status?: OrderStatus;
-  userId?: string;
-  from?: string;
-  to?: string;
-}
-
-export const getOrders = ({ page = 1, limit = 20, ...rest }: GetOrdersParams = {}) => {
-  const q = new URLSearchParams({ page: String(page), limit: String(limit) });
-  Object.entries(rest).forEach(([k, v]) => v != null && q.set(k, v));
-  return apiFetch<PaginatedResponse<Order>>(`/admin/orders?${q}`);
-};
-
-export const getOrder = (id: string) => apiFetch<OrderDetail>(`/admin/orders/${id}`);
-
-export const resendOrder = (id: string) =>
-  apiFetch<{ success: boolean }>(`/admin/orders/${id}/resend`, { method: 'POST' });
-```
-
-### 6.6 Products — [lib/api/products.ts](../lib/api/products.ts)
-
-```ts
-import { apiFetch } from './client';
-import type { ProductWithStats, ProductCategory, VoucherStats } from '@/lib/types';
-
-export const getProducts = (category?: ProductCategory) =>
-  apiFetch<ProductWithStats[]>(
-    `/admin/products${category ? `?category=${category}` : ''}`,
-  );
-
-export const getProduct = (id: string) =>
-  apiFetch<ProductWithStats>(`/admin/products/${id}`);
-
-export const createProduct = (body: {
-  name: string;
-  category: ProductCategory;
-  denomination: number;
-  currency?: string;
-}) =>
-  apiFetch<ProductWithStats>('/admin/products', {
-    method: 'POST',
-    body: JSON.stringify(body),
-  });
-
-export const updateProduct = (
-  id: string,
-  body: { name?: string; denomination?: number; isAvailable?: boolean },
-) =>
-  apiFetch<ProductWithStats>(`/admin/products/${id}`, {
-    method: 'PATCH',
-    body: JSON.stringify(body),
-  });
-
-export const uploadVouchers = (id: string, codes: string[]) =>
-  apiFetch<{ inserted: number }>(`/admin/products/${id}/vouchers`, {
-    method: 'POST',
-    body: JSON.stringify({ codes }),
-  });
-
-export const getVoucherStats = (id: string) =>
-  apiFetch<{ productId: string } & VoucherStats>(
-    `/admin/products/${id}/vouchers/stats`,
-  );
-```
-
-### 6.7 Audit — [lib/api/audit.ts](../lib/api/audit.ts)
-
-```ts
-import { apiFetch } from './client';
-import type { PaginatedResponse, AuditLog, AuditAction } from '@/lib/types';
-
-interface GetAuditLogsParams {
-  page?: number;
-  limit?: number;
-  actor?: string;
-  action?: AuditAction;
-  from?: string;
-  to?: string;
-}
-
-export const getAuditLogs = ({ page = 1, limit = 20, ...rest }: GetAuditLogsParams = {}) => {
-  const q = new URLSearchParams({ page: String(page), limit: String(limit) });
-  Object.entries(rest).forEach(([k, v]) => v != null && q.set(k, v));
-  return apiFetch<PaginatedResponse<AuditLog>>(`/admin/audit-logs?${q}`);
-};
-```
+If you add a new protected route, add it to **both** `PROTECTED_PATHS` and the `matcher` array in the same file — they're two separate lists that must stay in sync.
 
 ---
 
-## 7. Auth — Hook + Proxy (Next 16)
+## 7. Providers & Root Layout
 
-### 7.1 Auth Hook — [hooks/use-auth.ts](../hooks/use-auth.ts)
-
-```ts
-'use client';
-
-import Cookies from 'js-cookie';
-import { useRouter } from 'next/navigation';
-
-const TOKEN_KEY = 'admin_token';
-
-export function useAuth() {
-  const router = useRouter();
-
-  const getToken = (): string | null => Cookies.get(TOKEN_KEY) ?? null;
-
-  const saveToken = (token: string) => {
-    Cookies.set(TOKEN_KEY, token, {
-      expires: 1,                  // 1 day
-      sameSite: 'strict',
-      secure: process.env.NODE_ENV === 'production',
-    });
-  };
-
-  const logout = () => {
-    Cookies.remove(TOKEN_KEY);
-    router.push('/login');
-  };
-
-  const isLoggedIn = () => !!getToken();
-
-  return { getToken, saveToken, logout, isLoggedIn };
-}
-```
-
-### 7.2 Proxy — Next's Auth Guard — [proxy.ts](../proxy.ts)
-
-> **Next 16 change:** the file is `proxy.ts` (project root) and the exported function is `proxy`, not `middleware`. The `config.matcher` shape is unchanged.
-
-```ts
-import { NextRequest, NextResponse } from 'next/server';
-
-const PROTECTED_PATHS = [
-  '/dashboard',
-  '/users',
-  '/orders',
-  '/products',
-  '/audit',
-];
-
-export function proxy(req: NextRequest) {
-  const token = req.cookies.get('admin_token')?.value;
-  const { pathname } = req.nextUrl;
-
-  const isProtected = PROTECTED_PATHS.some((p) => pathname.startsWith(p));
-
-  if (isProtected && !token) {
-    const loginUrl = new URL('/login', req.url);
-    loginUrl.searchParams.set('redirect', pathname);
-    return NextResponse.redirect(loginUrl);
-  }
-
-  if (pathname === '/login' && token) {
-    return NextResponse.redirect(new URL('/dashboard', req.url));
-  }
-
-  return NextResponse.next();
-}
-
-export const config = {
-  matcher: [
-    '/dashboard/:path*',
-    '/users/:path*',
-    '/orders/:path*',
-    '/products/:path*',
-    '/audit/:path*',
-    '/login',
-  ],
-};
-```
-
-> The proxy only checks for cookie *existence*. A forged or expired token still produces a 401 from the API, which `apiFetch` handles by clearing the cookie and redirecting.
-
----
-
-## 8. Providers & Root Layout
-
-### `app/layout.tsx`
-
-The Panda theme is imported by `globals.css` (already in the project). Use `next/font/local` once the Satoshi `.otf` files land in `app/assets/satoshi/`:
+`app/layout.tsx` wraps everything in `<Providers>` (React Query + Sonner toaster) and sets `robots: { index: false, follow: false }` since this is an internal tool. `components/layout/providers.tsx` configures the shared `QueryClient`:
 
 ```tsx
-import type { Metadata } from 'next';
-import localFont from 'next/font/local';
-import './globals.css';
-import { Providers } from '@/components/layout/providers';
-import { Toaster } from '@/components/ui/sonner';
-
-const satoshi = localFont({
-  src: [
-    { path: './assets/satoshi/Satoshi-Regular.otf',    weight: '400', style: 'normal' },
-    { path: './assets/satoshi/Satoshi-Italic.otf',     weight: '400', style: 'italic' },
-    { path: './assets/satoshi/Satoshi-Bold.otf',       weight: '700', style: 'normal' },
-    { path: './assets/satoshi/Satoshi-BoldItalic.otf', weight: '700', style: 'italic' },
-  ],
-  variable: '--font-satoshi',
-  display: 'swap',
-});
-
-export const metadata: Metadata = {
-  title: 'PandaPay Admin',
-};
-
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="en" className={`${satoshi.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col">
-        <Providers>{children}</Providers>
-        <Toaster richColors position="top-right" />
-      </body>
-    </html>
-  );
-}
-```
-
-> Until the OTF files exist, drop the `localFont` import and let `globals.css` fall back to `sans-serif`.
-
-### `components/layout/providers.tsx`
-
-```tsx
-'use client';
-
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { useState } from 'react';
-
-export function Providers({ children }: { children: React.ReactNode }) {
-  const [queryClient] = useState(
-    () =>
-      new QueryClient({
-        defaultOptions: {
-          queries: {
-            staleTime: 30_000,
-            retry: 1,
-            refetchOnWindowFocus: false,
-          },
-        },
-      }),
-  );
-
-  return (
-    <QueryClientProvider client={queryClient}>
-      {children}
-      <ReactQueryDevtools initialIsOpen={false} />
-    </QueryClientProvider>
-  );
-}
-```
-
----
-
-## 9. Admin Shell Layout (Sidebar + Header)
-
-### `components/layout/nav-items.ts`
-
-```ts
-import { LayoutDashboard, Users, ShoppingBag, Package, FileText } from 'lucide-react';
-
-export const NAV_ITEMS = [
-  { label: 'Dashboard',  href: '/dashboard', icon: LayoutDashboard },
-  { label: 'Orders',     href: '/orders',    icon: ShoppingBag },
-  { label: 'Users',      href: '/users',     icon: Users },
-  { label: 'Products',   href: '/products',  icon: Package },
-  { label: 'Audit Log',  href: '/audit',     icon: FileText },
-];
-```
-
-### `app/(admin)/layout.tsx`
-
-```tsx
-import { Sidebar } from '@/components/layout/sidebar';
-import { Header } from '@/components/layout/header';
-
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex h-screen bg-background">
-      <Sidebar />
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <Header />
-        <main className="flex-1 overflow-y-auto p-6">{children}</main>
-      </div>
-    </div>
-  );
-}
-```
-
----
-
-## 10. Page Implementation Guide
-
-> **Next 16 reminder:** every dynamic page (`[id]/page.tsx`) receives `params` as `Promise<...>`. In a client component (which is what these all are because they use TanStack Query), unwrap with React's `use()` hook — see [§10.4](#104-user-detail-usersid).
-
-### 10.1 Login (`/login`)
-
-Single form — email + password → `POST /admin/auth/login` → save token → redirect.
-
-- React Hook Form + Zod for validation.
-- Show error toast on 401.
-- Honor the `?redirect=` param if present.
-
-```tsx
-const schema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1),
-});
-
-const { access_token } = await login(data.email, data.password);
-saveToken(access_token);
-router.push(redirectParam ?? '/dashboard');
-```
-
-### 10.2 Dashboard (`/dashboard`)
-
-`GET /admin/stats` — refetch every 30 seconds.
-
-```tsx
-const { data, isLoading } = useQuery({
-  queryKey: ['stats'],
-  queryFn: getStats,
-  refetchInterval: 30_000,
-});
-```
-
-**Stat cards:**
-- Total Users — subtitle `+{newLast7Days} this week`
-- Total Revenue `₦{totalNgn}` — subtitle `₦{last7DaysNgn} this week`
-- Fulfilled Orders `{fulfilled}` — subtitle `{failed} failed · {expired} expired`
-- Voucher Stock `{available} available` — subtitle `{used}/{total} used`
-
-**Charts:** see §11.
-
-### 10.3 Users (`/users`)
-
-`GET /admin/users?page&limit&search`. Use `nuqs` to keep page + search in URL.
-
-```tsx
-const [search, setSearch] = useQueryState('search', { defaultValue: '' });
-const [page, setPage]     = useQueryState('page', parseAsInteger.withDefault(1));
-const debouncedSearch     = useDebounce(search, 300);
-
-const { data, isLoading } = useQuery({
-  queryKey: ['users', page, debouncedSearch],
-  queryFn: () => getUsers({ page, search: debouncedSearch }),
-});
-
-useEffect(() => { setPage(1); }, [debouncedSearch]);
-```
-
-**Columns:** Display Name (fallback `—`), WhatsApp Number (fixed-width), Balance (`₦{walletBalance.toLocaleString()}`), Joined (`format(createdAt, 'dd MMM yyyy')`), Actions ("View" → `/users/{id}`).
-
-### 10.4 User Detail (`/users/[id]`)
-
-**Next 16 client-component pattern** for unwrapping `params`:
-
-```tsx
-'use client';
-
-import { use } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { getUser } from '@/lib/api/users';
-
-export default function UserDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = use(params);
-
-  const { data: user, isLoading } = useQuery({
-    queryKey: ['user', id],
-    queryFn: () => getUser(id),
-  });
-
-  // …
-}
-```
-
-**Layout:**
-```
-┌─────────────────────────────┬──────────────────┐
-│  Profile Card               │  PIN Status Card  │
-│  Name, Number, Balance      │  Attempts, Lock   │
-│  Joined date                │  [Unlock PIN btn] │
-└─────────────────────────────┴──────────────────┘
-┌────────────────────────────────────────────────┐
-│  Recent Orders (last 10, no pagination)        │
-└────────────────────────────────────────────────┘
-```
-
-**Unlock PIN:**
-```tsx
-const mutation = useMutation({
-  mutationFn: () => unlockPin(id),
-  onSuccess: () => {
-    toast.success('PIN unlocked');
-    queryClient.invalidateQueries({ queryKey: ['user', id] });
+new QueryClient({
+  defaultOptions: {
+    queries: { staleTime: 30_000, retry: 1, refetchOnWindowFocus: false },
   },
-});
+})
 ```
 
-Show button only when `pinStatus.isLocked === true`.
+Individual queries override `staleTime`/`refetchInterval` as needed (e.g. dashboard stats poll every 30s).
 
-### 10.5 Orders (`/orders`)
+Satoshi `.otf` files exist at `app/assets/satoshi/` but are not yet loaded via `next/font/local` — if you wire this up, the theme (`app/globals.css`) already has the CSS variable hooks expecting it.
 
-`GET /admin/orders?page&limit&status&userId&from&to`
+---
 
-**Filters:** Status select, date range (Calendar in a Popover), User ID input.
+## 8. Admin Shell Layout (Sidebar + Header)
 
-**Columns:** Order ID (truncated UUID, full on hover), User, Product, Amount, Mode (icon), Status (`<StatusBadge>`), Date (relative + absolute), Actions (View · Resend — only when `FULFILLED`).
+`app/(admin)/layout.tsx` is a **client component** — it calls `useMe()` and force-redirects to `/change-password` if `mustChangePassword` is true, before rendering `<Sidebar>` + `<Header>` + page content.
 
-**Resend** wrapped in `<ConfirmDialog>` — "Resend voucher code for this order?"
-
-### 10.6 Order Detail (`/orders/[id]`)
-
-Same `use(params)` pattern as §10.4.
-
-```
-┌──────────────────────────────────────────────────────┐
-│  Order Header: ID · Status badge · Created date       │
-├─────────────────────────┬────────────────────────────┤
-│  Order Info             │  Payment Info              │
-├─────────────────────────┼────────────────────────────┤
-│  User Info              │  Voucher Info              │
-└─────────────────────────┴────────────────────────────┘
-[Resend Voucher]  ← only when status = FULFILLED
-```
-
-### 10.7 Products (`/products`)
-
-`GET /admin/products` — full list, filter client-side by tab.
-
-```
-[All] [Gift Cards] [Game Top-Ups] [Airtime]
-```
-
-**Card layout:**
-```
-┌──────────────────────────────────────────┐
-│  Name                    [Available ●]   │
-│  Category tag · ₦Denomination            │
-│  Vouchers: ████████░░  8/10 available    │
-│                              [View →]    │
-└──────────────────────────────────────────┘
-```
-
-Stock bar color: green if `>30%`, amber if `>10%`, red if `≤10%`.
-
-**Create:** "New Product" → `<CreateProductDialog>`. On success, invalidate `['products']`.
-
-### 10.8 Product Detail (`/products/[id]`)
-
-`use(params)` for the id. Three sections:
-
-1. **Details card** — name, category, denomination, currency, availability toggle.
-2. **Voucher stats card** — total / available / used + mini progress bar.
-3. **Upload vouchers** — textarea (one code per line), parse and POST:
+Current nav (`components/layout/nav-items.ts`):
 
 ```ts
-const codes = textarea.value
-  .split('\n')
-  .map((c) => c.trim())
-  .filter(Boolean);
-// validate: max 500
+export const NAV_ITEMS: NavItem[] = [
+  { label: 'Dashboard',          href: '/dashboard',          permission: 'dashboard:view' },
+  { label: 'Orders',             href: '/orders',             permission: 'orders:view' },
+  { label: 'Transactions',       href: '/transactions',       permission: 'orders:view' },
+  { label: 'Users',              href: '/users',              permission: 'users:view' },
+  { label: 'Products',           href: '/products',           permission: 'products:view' },
+  { label: 'Pricing',            href: '/pricing',            permission: 'pricing:view' },
+  { label: 'Fraud Review',       href: '/fraud',               permission: 'fraud:view' },
+  { label: 'Payment exceptions', href: '/payment-exceptions', permission: 'orders:view' },
+  { label: 'Feature Flags',      href: '/feature-flags',      permission: 'feature-flags:view' },
+  { label: 'Audit Log',          href: '/audit',              permission: 'audit:view' },
+  { label: 'Team',               href: '/admins',             permission: 'admins:manage' },
+];
 ```
 
-After upload: toast `Inserted {n} vouchers`, refresh stats.
-
-### 10.9 Audit Log (`/audit`)
-
-`GET /admin/audit-logs?page&limit&actor&action&from&to`
-
-**Filters:** Actor input, Action select (all `AuditAction` values), date range.
-
-**Columns:** Actor (truncate UUIDs), Action (color-coded badge), Metadata (collapsible JSON), Time.
-
-**Action badge colors:** use Panda semantic tokens (`success-100/700`, `error-100/700`, `info-100/700`, `warning-100/700`, `neutral-100/700`) — keeps light/dark mode coherent.
+`NavItem.permission` is checked via `hasPermission()` before rendering each link — a `ADMIN`/Manager role simply doesn't see `Team`.
 
 ---
 
-## 11. Charts — Recommendation & Setup
+## 9. Page Inventory
 
-**Recharts** — native React, composable, works with Tailwind, ~400KB. Install: `pnpm add recharts`.
+Every page below is a client component using TanStack Query + the corresponding `lib/api/*.ts` module. Dynamic `[id]/page.tsx` routes receive `params` as `Promise<{ id: string }>` — unwrap with React's `use()` hook.
 
-### Order Status Bar Chart — `components/features/dashboard/orders-chart.tsx`
+| Route | Backend coverage | Notes |
+|---|---|---|
+| `/login` | `POST /admin/auth/login` (via BFF) | RHF + Zod, honors `?redirect=` |
+| `/change-password` | `POST /admin/me/change-password` | Force-navigated to when `mustChangePassword` is true |
+| `/dashboard` | `GET /admin/stats` | 30s poll, stat cards + charts (§10) |
+| `/users`, `/users/[id]` | Full | List + search (nuqs-synced), detail with PIN unlock, recent orders, payment history |
+| `/orders`, `/orders/[id]` | Full | Status/date/user filters, resend/fulfill/refund/retry actions gated by status |
+| `/transactions` | Reuses orders data | Payment-focused view over the same order/payment data |
+| `/products`, `/products/[id]` | Full | Category tabs, voucher upload (textarea, max 500 codes), pricing mode toggle |
+| `/pricing` | Full | Current rate, oracle rate, rate history, set-rate + recompute (SUPER_ADMIN) |
+| `/fraud` | Full | Approve/reject fraud events |
+| `/payment-exceptions` | Full | Resolve with note |
+| `/feature-flags` | Full | Toggle + time-window edit (SUPER_ADMIN) |
+| `/audit` | Full | Actor/action/date filters, collapsible metadata JSON |
+| `/admins` | Full | SUPER_ADMIN only — create/update/reset-password |
+| `/discount-codes` | Full | Viewable by both roles; generate/revoke SUPER_ADMIN only — see §16 |
 
-```tsx
-'use client';
-
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, Cell,
-} from 'recharts';
-import type { Stats } from '@/lib/types';
-
-const STATUS_COLORS: Record<string, string> = {
-  Fulfilled: 'var(--color-success-500)',
-  Pending:   'var(--color-warning-500)',
-  Paid:      'var(--color-info-500)',
-  Failed:    'var(--color-error-500)',
-  Expired:   'var(--color-neutral-300)',
-};
-
-export function OrdersChart({ orders }: { orders: Stats['orders'] }) {
-  const data = [
-    { name: 'Fulfilled', value: orders.fulfilled },
-    { name: 'Pending',   value: orders.pending },
-    { name: 'Paid',      value: orders.paid },
-    { name: 'Failed',    value: orders.failed },
-    { name: 'Expired',   value: orders.expired },
-  ];
-
-  return (
-    <ResponsiveContainer width="100%" height={220}>
-      <BarChart data={data} barCategoryGap="30%">
-        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border-subtle)" />
-        <XAxis dataKey="name" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
-        <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} width={30} />
-        <Tooltip contentStyle={{ borderRadius: '8px', fontSize: '13px' }} />
-        <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-          {data.map((entry) => (
-            <Cell key={entry.name} fill={STATUS_COLORS[entry.name]} />
-          ))}
-        </Bar>
-      </BarChart>
-    </ResponsiveContainer>
-  );
-}
-```
-
-### Revenue Chart — `components/features/dashboard/revenue-chart.tsx`
-
-`/admin/stats` only returns total + last-7-days totals — no time series. **Option A** (current): two-bar comparison "Last 7 days" vs "All-time 7-day average". **Option B** (future): add `GET /admin/stats/revenue-series?days=30` to backend, switch to `<AreaChart>`.
+**Action badge/status colors:** use Panda semantic tokens (`success-100/700`, `error-100/700`, `info-100/700`, `warning-100/700`, `neutral-100/700`) for consistent light/dark mode.
 
 ---
 
-## 12. Reusable Components
+## 10. Charts
 
-### `components/shared/status-badge.tsx`
-
-```tsx
-import { Badge } from '@/components/ui/badge';
-import type { OrderStatus } from '@/lib/types';
-import { cn } from '@/lib/utils';
-
-const STYLES: Record<OrderStatus, string> = {
-  PENDING:   'bg-warning-100 text-warning-700 hover:bg-warning-100',
-  PAID:      'bg-info-100 text-info-700 hover:bg-info-100',
-  FULFILLED: 'bg-success-100 text-success-700 hover:bg-success-100',
-  EXPIRED:   'bg-neutral-100 text-neutral-500 hover:bg-neutral-100',
-  FAILED:    'bg-error-100 text-error-700 hover:bg-error-100',
-};
-
-export function StatusBadge({ status }: { status: OrderStatus }) {
-  return (
-    <Badge className={cn('font-medium border-0', STYLES[status])}>
-      {status}
-    </Badge>
-  );
-}
-```
-
-### `components/shared/stat-card.tsx`
-
-```tsx
-import { Card, CardContent } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
-import type { LucideIcon } from 'lucide-react';
-
-interface StatCardProps {
-  label: string;
-  value: string | number;
-  subtitle?: string;
-  icon: LucideIcon;
-  isLoading?: boolean;
-}
-
-export function StatCard({ label, value, subtitle, icon: Icon, isLoading }: StatCardProps) {
-  return (
-    <Card>
-      <CardContent className="flex items-start justify-between p-6">
-        <div className="space-y-1">
-          <p className="text-sm text-neutral-400">{label}</p>
-          {isLoading ? (
-            <Skeleton className="h-8 w-24" />
-          ) : (
-            <p className="text-2xl font-bold">{value}</p>
-          )}
-          {subtitle && <p className="text-xs text-neutral-400">{subtitle}</p>}
-        </div>
-        <div className="rounded-md bg-surface p-2">
-          <Icon className="h-5 w-5 text-neutral-400" />
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-```
-
-### `components/shared/pagination-controls.tsx`
-
-```tsx
-import { Button } from '@/components/ui/button';
-
-interface Props {
-  page: number;
-  limit: number;
-  total: number;
-  onPageChange: (page: number) => void;
-}
-
-export function PaginationControls({ page, limit, total, onPageChange }: Props) {
-  const totalPages = Math.ceil(total / limit);
-  const from = (page - 1) * limit + 1;
-  const to = Math.min(page * limit, total);
-
-  return (
-    <div className="flex items-center justify-between text-sm text-neutral-400">
-      <span>Showing {from}–{to} of {total}</span>
-      <div className="flex gap-2">
-        <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => onPageChange(page - 1)}>
-          Previous
-        </Button>
-        <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => onPageChange(page + 1)}>
-          Next
-        </Button>
-      </div>
-    </div>
-  );
-}
-```
-
-### `components/shared/confirm-dialog.tsx`
-
-```tsx
-import {
-  Dialog, DialogContent, DialogDescription,
-  DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-
-interface Props {
-  trigger: React.ReactNode;
-  title: string;
-  description: string;
-  confirmLabel?: string;
-  variant?: 'default' | 'destructive';
-  onConfirm: () => void;
-  isPending?: boolean;
-}
-
-export function ConfirmDialog({
-  trigger, title, description, confirmLabel = 'Confirm',
-  variant = 'default', onConfirm, isPending,
-}: Props) {
-  return (
-    <Dialog>
-      <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>{description}</DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <Button variant={variant} onClick={onConfirm} disabled={isPending}>
-            {isPending ? 'Loading…' : confirmLabel}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-```
+**Recharts** is already installed and used on `/dashboard`. `orders-chart.tsx` renders a bar chart of order status counts using the Panda semantic color tokens. `/admin/stats` only returns totals + last-7-day aggregates (no time series), so the revenue chart is a two-bar comparison rather than a line/area chart. If a real time series is needed, that requires a new backend endpoint (e.g. `GET /admin/stats/revenue-series?days=30`) — not currently planned.
 
 ---
 
-## 13. Form Patterns
+## 11. Reusable Components
 
-Zod schemas live next to their form component:
+`components/shared/` — still accurate, these are genuinely generic and haven't drifted:
 
-```ts
-const schema = z.object({
-  name:         z.string().min(2, 'Min 2 characters'),
-  category:     z.enum(['GIFT_CARD', 'GAME_TOP_UP', 'AIRTIME']),
-  denomination: z.coerce.number().min(1, 'Must be > 0'),
-  currency:     z.string().optional(),
-});
-```
+- **`status-badge.tsx`** — maps `OrderStatus` (`PENDING | PAID | FULFILLED | EXPIRED | FAILED`) to a colored `<Badge>` using the semantic tokens above.
+- **`stat-card.tsx`** — label/value/subtitle/icon dashboard tile with a `Skeleton` loading state.
+- **`pagination-controls.tsx`** — `{ page, limit, total, onPageChange }` — Previous/Next with a "Showing X–Y of Z" label.
+- **`confirm-dialog.tsx`** — generic "Are you sure?" wrapper used for resend/refund/revoke-style destructive or important actions, with `variant: 'default' | 'destructive'` and an `isPending` state.
+- **`data-table.tsx`**, **`page-header.tsx`**, **`empty-state.tsx`** — generic table/layout/empty-state wrappers used across every list page.
 
-Submit pattern:
+Read these directly rather than copying snippets here — they're small and stable.
+
+---
+
+## 12. Form Patterns
+
+Zod schema next to the form component, React Hook Form + `zodResolver`, TanStack `useMutation` for the submit, `queryClient.invalidateQueries` on success, toast on error:
 
 ```tsx
-const form = useForm<z.infer<typeof schema>>({ resolver: zodResolver(schema) });
-
 const mutation = useMutation({
-  mutationFn: (data: z.infer<typeof schema>) => createProduct(data),
+  mutationFn: (data: FormValues) => someApiCall(data),
   onSuccess: () => {
-    toast.success('Product created');
-    queryClient.invalidateQueries({ queryKey: ['products'] });
+    toast.success('Saved');
+    queryClient.invalidateQueries({ queryKey: ['resource-key'] });
     form.reset();
-    setOpen(false);
   },
   onError: (e) => toast.error(e.message),
 });
-
-const onSubmit = form.handleSubmit((data) => mutation.mutate(data));
 ```
 
-Disable submit button while `mutation.isPending`.
+Disable the submit button while `mutation.isPending`.
 
 ---
 
-## 14. Error & Loading Patterns
+## 13. Error & Loading Patterns
 
-**Loading:** Shadcn `Skeleton` shaped like the final content. No raw spinners.
+- **Loading:** Shadcn `Skeleton` shaped like the final content — no raw spinners.
+- **Error:** icon + message + retry button calling `refetch()`.
+- **Empty:** `<EmptyState message="..." />` when `data.data.length === 0`.
+- **401:** handled centrally in `apiFetch` (`lib/api/client.ts`) — redirects to `/login` unless already there. No per-component handling needed.
+- **403:** `apiFetch` throws an `ApiError` with a permission-denied message — surface it as a toast, don't silently swallow it (this is the real enforcement point, not the client-side `hasPermission()` check).
 
-```tsx
-if (isLoading) return <TableSkeleton rows={10} cols={6} />;
-```
+---
 
-**Error:**
-```tsx
-if (isError) {
-  return (
-    <div className="flex flex-col items-center gap-2 py-12 text-neutral-400">
-      <AlertCircle className="h-8 w-8" />
-      <p>Failed to load data</p>
-      <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-    </div>
-  );
+## 14. Backend CORS
+
+Already implemented — `pandapay-be/src/main.ts` calls `app.enableCors({ origin: corsOrigins, credentials: true })`, where `corsOrigins` is built from `ADMIN_FRONTEND_URL` / `PUBLIC_FRONTEND_URL` / `STORE_FRONTEND_URL` env vars. Nothing to add on a fresh setup — just confirm `ADMIN_FRONTEND_URL=http://localhost:3001` is set in `pandapay-be`'s `.env` for local dev.
+
+---
+
+## 15. Deployment (Vercel)
+
+1. `panda-admin` has its own git repo — push to GitHub as usual.
+2. Import into Vercel.
+3. Set env var `API_URL=https://api.pandapay.io` (see [§2](#2-environment-variables) — `API_URL` is preferred over `NEXT_PUBLIC_API_URL`).
+4. Custom domain → Vercel project settings + DNS.
+5. Confirm the deployed admin origin is added to `pandapay-be`'s `ADMIN_FRONTEND_URL` in production.
+
+---
+
+## 16. Discount Codes Admin UI
+
+The backend module (`DISC-001`, `FEATURES.json` status `PASS`) is fully built and live at `admin/discount-codes`, and the frontend now consumes it (`app/(admin)/discount-codes/page.tsx`, `components/features/discount-codes/`). This section is kept as the contract reference this was built from — read it before changing the discount-codes UI.
+
+### Backend contract (`pandapay-be/src/admin/controllers/discount-codes-admin.controller.ts`)
+
+**`GET /admin/discount-codes`** — any admin. Query params: `page`, `limit` (default 20, max 100), `status?: 'ACTIVE'|'USED'|'EXPIRED'|'REVOKED'`, `productId?`, `category?`. Returns `{ data: DiscountCode[], total, page, limit }`.
+
+**`POST /admin/discount-codes/generate`** — SUPER_ADMIN only. Body (`GenerateDiscountCodesDto`):
+```ts
+{
+  count: number;              // 1–500
+  productId?: string;         // UUID — exactly one of productId/category
+  category?: ProductCategory; // 'GIFT_CARD' | 'GAME_TOP_UP' | 'AIRTIME' | 'CONSOLE_VOUCHER' | 'ENTERTAINMENT'
+  discountType: 'PERCENTAGE' | 'FIXED_AMOUNT';
+  discountValue: number;      // > 0
+  expiresInDays?: number;     // 1–90
+  recipientLabel?: string;    // informational only, max 120 chars
 }
 ```
 
-**Empty:**
-```tsx
-if (data?.data.length === 0) return <EmptyState message="No orders found" />;
-```
+**`PATCH /admin/discount-codes/:id/revoke`** — SUPER_ADMIN only. No body.
 
-**401:** handled in `apiFetch` — clears cookie, redirects. No per-component handling needed.
-
----
-
-## 15. Backend CORS Change Required
-
-The NestJS backend at `src/main.ts` must allow requests from `http://localhost:3001` in dev. Add before `app.listen()`:
+### `DiscountCode` entity shape (add to `lib/types.ts`)
 
 ```ts
-// src/main.ts
-app.enableCors({
-  origin: process.env.ADMIN_FRONTEND_URL ?? 'http://localhost:3001',
-  credentials: true,
-});
+export type DiscountCodeStatus = 'ACTIVE' | 'USED' | 'EXPIRED' | 'REVOKED';
+export type DiscountType = 'PERCENTAGE' | 'FIXED_AMOUNT';
+
+export interface DiscountCode {
+  id: string;
+  code: string;
+  productId: string | null;      // exactly one of productId/category is set
+  category: ProductCategory | null;
+  discountType: DiscountType;
+  discountValue: string;         // DECIMAL — string
+  recipientLabel: string | null;
+  expiresAt: string;
+  isUsed: boolean;
+  usedAt: string | null;
+  usedByOrderId: string | null;
+  isRevoked: boolean;
+  revokedAt: string | null;
+  revokedBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
 ```
 
-Backend `.env`:
-```
-ADMIN_FRONTEND_URL=http://localhost:3001
-# Production:
-# ADMIN_FRONTEND_URL=https://admin.pandapay.io
-```
+Note the backend has no derived `status` field on the entity itself — `ACTIVE/USED/EXPIRED/REVOKED` is computed server-side for filtering (`applyStatusFilter` in `discount-codes.service.ts`) from `isUsed`/`isRevoked`/`expiresAt`. The frontend should derive a display status the same way (`isRevoked` → REVOKED, else `isUsed` → USED, else `expiresAt < now` → EXPIRED, else ACTIVE) rather than expecting the API to return it.
+
+### What was built (checklist, now complete)
+
+1. **`lib/api/discount-codes.ts`** — `listDiscountCodes()`, `generateDiscountCodes()`, `revokeDiscountCode()`, mirroring the pattern in `lib/api/fraud.ts`/`lib/api/payment-exceptions.ts`.
+2. **`lib/types.ts`** — `DiscountCode`, `DiscountCodeStatus`, `DiscountType`, `GenerateDiscountCodesInput` as specified above.
+3. **`lib/permissions.ts`** — `discount-codes:view` (both roles) / `discount-codes:manage` (SUPER_ADMIN only, matching the backend's `SuperAdminGuard` on generate/revoke).
+4. **`app/(admin)/discount-codes/page.tsx`** — paginated table with status filter tabs, "Generate codes" dialog gated to SUPER_ADMIN, per-row revoke wrapped in `<ConfirmDialog variant="destructive">` (only shown while a code is `ACTIVE`).
+5. **`components/features/discount-codes/`** — `generate-discount-codes-dialog.tsx` (two-panel form → generated-codes-with-copy-all result, mirroring `create-admin-dialog.tsx`'s temp-password reveal pattern) and `discount-status-badge.tsx` (client-derived status, since the backend has no `status` column).
+6. **`components/layout/nav-items.ts`** — `Tag`-icon nav entry gated on `discount-codes:view`.
+7. **`proxy.ts`** — `/discount-codes` added to both `PROTECTED_PATHS` and `matcher`.
 
 ---
 
-## 16. Deployment (Vercel)
-
-1. Push `panda-admin` to its own GitHub repo.
-2. Import into Vercel.
-3. Set env var: `NEXT_PUBLIC_API_URL=https://api.pandapay.io`.
-4. Custom domain `admin.pandapay.io` → set in Vercel project settings, point DNS.
-
-> Vercel handles Next 16 App Router natively. The Panda theme works without any extra Vercel config.
-
----
-
-*Last updated: 2026-05-06 · Guide version 2.0 (Next 16 + no-src layout)*
+*Last updated: 2026-07-20 · Guide version 3.0 (rewritten against actual source — see staleness note at top)*
