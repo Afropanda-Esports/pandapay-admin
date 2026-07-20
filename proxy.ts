@@ -14,6 +14,7 @@ const PROTECTED_PATHS = [
   '/fraud',
   '/payment-exceptions',
   '/feature-flags',
+  '/discount-codes',
   '/change-password',
 ];
 
@@ -59,6 +60,7 @@ export const config = {
     '/fraud/:path*',
     '/payment-exceptions/:path*',
     '/feature-flags/:path*',
+    '/discount-codes/:path*',
     '/change-password',
     '/login',
   ],

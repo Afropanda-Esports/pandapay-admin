@@ -306,3 +306,43 @@ export interface LoginResponse {
   email?: string;
   display_name?: string;
 }
+
+// ─── Discount codes ───────────────────────────────────────────────────────────
+
+export type DiscountType = 'PERCENTAGE' | 'FIXED_AMOUNT';
+
+/**
+ * Not returned by the API — the backend has no `status` column, only
+ * `isUsed`/`isRevoked`/`expiresAt`. Derive this client-side (see
+ * discount-status-badge.tsx) mirroring the backend's own filter precedence.
+ */
+export type DiscountCodeStatus = 'ACTIVE' | 'USED' | 'EXPIRED' | 'REVOKED';
+
+export interface DiscountCode {
+  id: string;
+  code: string;
+  productId: string | null; // exactly one of productId/category is set
+  category: ProductCategory | null;
+  discountType: DiscountType;
+  discountValue: string; // DECIMAL — string
+  recipientLabel: string | null;
+  expiresAt: string;
+  isUsed: boolean;
+  usedAt: string | null;
+  usedByOrderId: string | null;
+  isRevoked: boolean;
+  revokedAt: string | null;
+  revokedBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GenerateDiscountCodesInput {
+  count: number; // 1–500
+  productId?: string;
+  category?: ProductCategory;
+  discountType: DiscountType;
+  discountValue: number;
+  expiresInDays?: number; // 1–90
+  recipientLabel?: string;
+}

@@ -10,6 +10,7 @@ import {
   Coins,
   Flag,
   AlertTriangle,
+  Tag,
   type LucideIcon,
 } from 'lucide-react';
 import type { AdminPermission } from '@/lib/permissions';
@@ -36,6 +37,12 @@ export const NAV_ITEMS: NavItem[] = [
     permission: 'orders:view',
   },
   { label: 'Feature Flags', href: '/feature-flags', icon: Flag, permission: 'feature-flags:view' },
+  {
+    label: 'Discount Codes',
+    href: '/discount-codes',
+    icon: Tag,
+    permission: 'discount-codes:view',
+  },
   { label: 'Audit Log', href: '/audit', icon: FileText, permission: 'audit:view' },
   {
     label: 'Team',
