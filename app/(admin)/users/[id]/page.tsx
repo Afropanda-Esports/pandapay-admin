@@ -90,6 +90,7 @@ function ProfileCard({ user }: Readonly<{ user: UserDetail }>) {
           label="Display Name"
           value={user.displayName ?? '—'}
         />
+        <DetailRow label="Email" value={user.email ?? '—'} />
         <DetailRow
           label="WhatsApp"
           value={<span className="font-mono">{user.whatsappNumber}</span>}

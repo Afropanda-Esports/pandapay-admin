@@ -108,6 +108,7 @@ export interface UserListItem {
   id: string;
   whatsappNumber: string;
   displayName: string | null;
+  email: string | null;
   createdAt: string;
   orderCount: number;
 }
