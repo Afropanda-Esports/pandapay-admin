@@ -12,6 +12,7 @@ interface GetOrdersParams {
   limit?: number;
   status?: OrderStatus;
   userId?: string;
+  orderId?: string;
   from?: string;
   to?: string;
 }
