@@ -58,6 +58,7 @@ const STATUS_SELECT_ITEMS: Record<string, string> = {
 export const orderListParsers = {
   status: parseAsStringLiteral(STATUS_VALUES),
   userId: parseAsString,
+  orderId: parseAsString,
   from: parseAsString,
   to: parseAsString,
   page: parseAsInteger.withDefault(1),
@@ -80,12 +81,14 @@ export function OrderFilters() {
     shallow: false,
   });
   const [userIdDraft, setUserIdDraft] = useState(filters.userId ?? '');
+  const [orderIdDraft, setOrderIdDraft] = useState(filters.orderId ?? '');
 
   const fromDate = safeParse(filters.from);
   const toDate = safeParse(filters.to);
   const hasFilter =
     Boolean(filters.status) ||
     Boolean(filters.userId) ||
+    Boolean(filters.orderId) ||
     Boolean(filters.from) ||
     Boolean(filters.to);
 
@@ -110,11 +113,19 @@ export function OrderFilters() {
     setFilters({ userId: trimmed || null, page: 1 });
   };
 
+  const commitOrderId = () => {
+    const trimmed = orderIdDraft.trim();
+    if ((filters.orderId ?? '') === trimmed) return;
+    setFilters({ orderId: trimmed || null, page: 1 });
+  };
+
   const handleReset = () => {
     setUserIdDraft('');
+    setOrderIdDraft('');
     setFilters({
       status: null,
       userId: null,
+      orderId: null,
       from: null,
       to: null,
       page: 1,
@@ -176,6 +187,20 @@ export function OrderFilters() {
           }
         }}
         placeholder="User ID"
+        className="w-50 font-mono text-xs"
+      />
+
+      <Input
+        value={orderIdDraft}
+        onChange={(e) => setOrderIdDraft(e.target.value)}
+        onBlur={commitOrderId}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            commitOrderId();
+          }
+        }}
+        placeholder="Order ID"
         className="w-50 font-mono text-xs"
       />
 
