@@ -5,6 +5,8 @@ import { AlertCircle, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
 
+import { getCategories } from '@/lib/api/categories';
+
 import { CreateProductDialog } from '@/components/features/products/create-product-dialog';
 import { EmptyState } from '@/components/shared/empty-state';
 import { PageHeader } from '@/components/shared/page-header';
@@ -20,11 +22,6 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { getProducts } from '@/lib/api/products';
-import {
-  CATEGORY_LABEL,
-  PRODUCT_CATEGORY_TABS,
-  type ProductCategoryTab,
-} from '@/lib/product-categories';
 import type { ProductWithStats } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
@@ -107,7 +104,7 @@ function ProductCard({ product }: Readonly<{ product: ProductWithStats }>) {
           />
         </div>
         <p className="text-xs text-muted-foreground">
-          {CATEGORY_LABEL[product.category]} ·{' '}
+          {product.category?.name || 'Unknown'} ·{' '}
           {formatPrice(product.snapshotNgnPrice, product.currency)}
         </p>
       </CardHeader>
@@ -169,7 +166,7 @@ function ProductsError({ onRetry }: Readonly<{ onRetry: () => void }>) {
   );
 }
 
-function ProductsEmpty({ tab }: Readonly<{ tab: ProductCategoryTab }>) {
+function ProductsEmpty({ tab }: Readonly<{ tab: string }>) {
   const isAll = tab === 'ALL';
   return (
     <EmptyState
@@ -204,7 +201,7 @@ function ProductsBody({
   isError: boolean;
   refetch: () => void;
   products: ProductWithStats[] | undefined;
-  tab: ProductCategoryTab;
+  tab: string;
 }>) {
   if (isError) return <ProductsError onRetry={refetch} />;
   if (isLoading || !products) return <ProductsLoading />;
@@ -213,7 +210,12 @@ function ProductsBody({
 }
 
 export default function ProductsPage() {
-  const [tab, setTab] = useState<ProductCategoryTab>('ALL');
+  const [tab, setTab] = useState<string>('ALL');
+
+  const { data: categories = [] } = useQuery({
+    queryKey: ['categories'],
+    queryFn: getCategories,
+  });
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['products', tab],
@@ -233,13 +235,14 @@ export default function ProductsPage() {
 
       <Tabs
         value={tab}
-        onValueChange={(v) => setTab(v as ProductCategoryTab)}
+        onValueChange={setTab}
         className="mb-4"
       >
         <TabsList>
-          {PRODUCT_CATEGORY_TABS.map((t) => (
-            <TabsTrigger key={t.value} value={t.value}>
-              {t.label}
+          <TabsTrigger value="ALL">All Categories</TabsTrigger>
+          {categories.map((c) => (
+            <TabsTrigger key={c.id} value={c.id}>
+              {c.name}
             </TabsTrigger>
           ))}
         </TabsList>

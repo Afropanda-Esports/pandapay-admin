@@ -27,7 +27,6 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { ApiError } from '@/lib/api/client';
 import { getProduct, updateProduct } from '@/lib/api/products';
-import { CATEGORY_LABEL } from '@/lib/product-categories';
 import type { ProductWithStats } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
@@ -102,7 +101,7 @@ function DetailsCard({
           <DetailRow label="Name" value={product.name} />
           <DetailRow
             label="Category"
-            value={CATEGORY_LABEL[product.category]}
+            value={product.category?.name || 'Unknown'}
           />
           <DetailRow label="Currency" value={product.currency} />
           <DetailRow
@@ -286,7 +285,7 @@ export default function ProductDetailPage({
     <div>
       <PageHeader
         title={product.name}
-        description={`${CATEGORY_LABEL[product.category]} · ${formatPrice(
+        description={`${product.category?.name || 'Unknown'} · ${formatPrice(
           product.snapshotNgnPrice,
           product.currency,
         )}`}

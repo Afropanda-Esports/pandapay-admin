@@ -3,21 +3,45 @@ import type {
   PricingMode,
   Product,
   ProductWithStats,
-  ProductCategory,
   VoucherStats,
+  Region,
+  ProductBrand,
 } from '@/lib/types';
 
-export const getProducts = (category?: ProductCategory) =>
+export const getRegions = () => apiFetch<Region[]>('/admin/regions');
+
+export const createRegion = (body: { code: string; name: string; currency: string }) =>
+  apiFetch<Region>('/admin/regions', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+
+export const updateRegion = (id: string, body: { name: string; isActive?: boolean }) =>
+  apiFetch<Region>(`/admin/regions/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+
+export const getProductBrands = (regionId?: string, categoryId?: string) => {
+  const params = new URLSearchParams();
+  if (regionId) params.append('regionId', regionId);
+  if (categoryId) params.append('categoryId', categoryId);
+  const q = params.toString();
+  return apiFetch<ProductBrand[]>(`/admin/product-brands${q ? `?${q}` : ''}`);
+};
+
+export const getProducts = (categoryId?: string) =>
   apiFetch<ProductWithStats[]>(
-    `/admin/products${category ? `?category=${category}` : ''}`,
+    `/admin/products${categoryId ? `?categoryId=${categoryId}` : ''}`,
   );
 
 export const getProduct = (id: string) =>
   apiFetch<ProductWithStats>(`/admin/products/${id}`);
 
 export const createProduct = (body: {
+  brandId: string;
   name: string;
-  category: ProductCategory;
+  categoryId: string;
   currency?: string;
   pricingMode: PricingMode;
   priceUsd?: number;

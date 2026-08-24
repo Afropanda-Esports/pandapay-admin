@@ -17,8 +17,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { usePermissions } from '@/hooks/use-permissions';
 import { listDiscountCodes, revokeDiscountCode } from '@/lib/api/discount-codes';
 import { getProducts } from '@/lib/api/products';
+import { getCategories } from '@/lib/api/categories';
 import { ApiError } from '@/lib/api/client';
-import { CATEGORY_LABEL } from '@/lib/product-categories';
 import type { DiscountCode, DiscountCodeStatus } from '@/lib/types';
 
 const PAGE_SIZE = 20;
@@ -63,6 +63,13 @@ export default function DiscountCodesPage() {
     staleTime: 60_000,
   });
   const productNameById = new Map((products ?? []).map((p) => [p.id, p.name]));
+
+  const { data: categories = [] } = useQuery({
+    queryKey: ['categories'],
+    queryFn: getCategories,
+    staleTime: 60_000,
+  });
+  const categoryNameById = new Map((categories ?? []).map((c) => [c.id, c.name]));
 
   const revoke = useMutation({
     mutationFn: revokeDiscountCode,
@@ -137,8 +144,8 @@ export default function DiscountCodesPage() {
                   <tr key={code.id} className="border-t border-border/60 align-middle">
                     <td className="px-3 py-2 font-mono text-xs">{code.code}</td>
                     <td className="px-3 py-2 text-xs text-muted-foreground">
-                      {code.category
-                        ? CATEGORY_LABEL[code.category]
+                      {code.categoryId
+                        ? categoryNameById.get(code.categoryId) || 'Unknown Category'
                         : (code.productId && productNameById.get(code.productId)) ||
                           `${code.productId?.slice(0, 8)}…`}
                     </td>
