@@ -9,8 +9,10 @@ import {
   ShieldAlert,
   Coins,
   Flag,
+  Globe,
   AlertTriangle,
   Tag,
+  FolderTree,
   type LucideIcon,
 } from 'lucide-react';
 import type { AdminPermission } from '@/lib/permissions';
@@ -28,6 +30,8 @@ export const NAV_ITEMS: NavItem[] = [
   { label: 'Transactions', href: '/transactions', icon: Receipt, permission: 'orders:view' },
   { label: 'Users', href: '/users', icon: Users, permission: 'users:view' },
   { label: 'Products', href: '/products', icon: Package, permission: 'products:view' },
+  { label: 'Categories', href: '/categories', icon: FolderTree, permission: 'products:view' },
+  { label: 'Regions', href: '/regions', icon: Globe, permission: 'products:view' },
   { label: 'Pricing', href: '/pricing', icon: Coins, permission: 'pricing:view' },
   { label: 'Fraud Review', href: '/fraud', icon: ShieldAlert, permission: 'fraud:view' },
   {

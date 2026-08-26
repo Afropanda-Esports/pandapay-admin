@@ -30,8 +30,8 @@ import {
 import { ApiError } from '@/lib/api/client';
 import { generateDiscountCodes } from '@/lib/api/discount-codes';
 import { getProducts } from '@/lib/api/products';
-import { PRODUCT_CATEGORY_OPTIONS } from '@/lib/product-categories';
-import type { DiscountCode, ProductCategory } from '@/lib/types';
+import { getCategories } from '@/lib/api/categories';
+import type { DiscountCode } from '@/lib/types';
 
 const DISCOUNT_TYPE_OPTIONS = [
   { value: 'PERCENTAGE', label: 'Percentage off' },
@@ -40,19 +40,12 @@ const DISCOUNT_TYPE_OPTIONS = [
 
 const targetTypeValues = ['product', 'category'] as const;
 const discountTypeValues = ['PERCENTAGE', 'FIXED_AMOUNT'] as const;
-const categoryValues = [
-  'GIFT_CARD',
-  'GAME_TOP_UP',
-  'AIRTIME',
-  'CONSOLE_VOUCHER',
-  'ENTERTAINMENT',
-] as const satisfies readonly ProductCategory[];
 
 const schema = z
   .object({
     targetType: z.enum(targetTypeValues),
     productId: z.string().optional(),
-    category: z.enum(categoryValues).optional(),
+    categoryId: z.string().optional(),
     count: z.coerce.number().int().min(1).max(500),
     discountType: z.enum(discountTypeValues),
     discountValue: z.coerce.number().min(0.01),
@@ -67,11 +60,11 @@ const schema = z
         path: ['productId'],
       });
     }
-    if (data.targetType === 'category' && !data.category) {
+    if (data.targetType === 'category' && !data.categoryId) {
       ctx.addIssue({
         code: 'custom',
         message: 'Select a category',
-        path: ['category'],
+        path: ['categoryId'],
       });
     }
   });
@@ -89,12 +82,18 @@ export function GenerateDiscountCodesDialog() {
     staleTime: 60_000,
   });
 
+  const { data: categories } = useQuery({
+    queryKey: ['categories'],
+    queryFn: getCategories,
+    staleTime: 60_000,
+  });
+
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
       targetType: 'category',
       productId: undefined,
-      category: undefined,
+      categoryId: undefined,
       count: 10,
       discountType: 'PERCENTAGE',
       discountValue: '' as unknown as number,
@@ -110,7 +109,7 @@ export function GenerateDiscountCodesDialog() {
       generateDiscountCodes({
         count: data.count,
         productId: data.targetType === 'product' ? data.productId : undefined,
-        category: data.targetType === 'category' ? data.category : undefined,
+        categoryId: data.targetType === 'category' ? data.categoryId : undefined,
         discountType: data.discountType,
         discountValue: data.discountValue,
         expiresInDays: data.expiresInDays,
@@ -225,10 +224,9 @@ export function GenerateDiscountCodesDialog() {
                   <FieldLabel htmlFor="discount-category">Category</FieldLabel>
                   <Controller
                     control={form.control}
-                    name="category"
+                    name="categoryId"
                     render={({ field }) => (
                       <Select
-                        items={PRODUCT_CATEGORY_OPTIONS}
                         value={field.value ?? ''}
                         onValueChange={(v) => field.onChange(v)}
                         disabled={mutation.isPending}
@@ -237,16 +235,16 @@ export function GenerateDiscountCodesDialog() {
                           <SelectValue placeholder="Select a category" />
                         </SelectTrigger>
                         <SelectContent>
-                          {PRODUCT_CATEGORY_OPTIONS.map((opt) => (
-                            <SelectItem key={opt.value} value={opt.value}>
-                              {opt.label}
+                          {(categories ?? []).map((opt) => (
+                            <SelectItem key={opt.id} value={opt.id}>
+                              {opt.name}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     )}
                   />
-                  <FieldError>{form.formState.errors.category?.message}</FieldError>
+                  <FieldError>{form.formState.errors.categoryId?.message}</FieldError>
                 </Field>
               )}
 

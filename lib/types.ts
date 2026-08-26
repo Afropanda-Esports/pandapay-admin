@@ -8,12 +8,13 @@ export type OrderStatus =
   | 'FAILED';
 export type PaymentMode = 'WALLET' | 'DIRECT_TRANSFER' | 'CRYPTO';
 export type OrderSource = 'whatsapp' | 'web_store' | 'agent';
-export type ProductCategory =
-  | 'GIFT_CARD'
-  | 'GAME_TOP_UP'
-  | 'AIRTIME'
-  | 'CONSOLE_VOUCHER'
-  | 'ENTERTAINMENT';
+export interface Category {
+  id: string;
+  code: string;
+  name: string;
+  isActive: boolean;
+  createdAt: string;
+}
 export type AdminRole = 'SUPER_ADMIN' | 'ADMIN';
 export type AuditAction =
   | 'WALLET_CREDIT'
@@ -144,7 +145,8 @@ export interface UserDirectoryItem {
 export interface OrderProductRef {
   id: string;
   name: string;
-  category: ProductCategory;
+  categoryId: string;
+  category?: Category;
   snapshotNgnPrice: string;
   currency: string;
   isAvailable: boolean;
@@ -218,6 +220,25 @@ export interface PaymentException {
 
 // ─── Products ─────────────────────────────────────────────────────────────────
 
+export interface Region {
+  id: string;
+  code: string;
+  name: string;
+  currency: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface ProductBrand {
+  id: string;
+  regionId: string;
+  categoryId: string;
+  category?: Category;
+  name: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
 export interface VoucherStats {
   total: number;
   available: number;
@@ -226,8 +247,10 @@ export interface VoucherStats {
 
 export interface Product {
   id: string;
+  brandId: string;
   name: string;
-  category: ProductCategory;
+  categoryId: string;
+  category?: Category;
   currency: string;
   isAvailable: boolean;
   pricingMode: PricingMode;
@@ -323,7 +346,8 @@ export interface DiscountCode {
   id: string;
   code: string;
   productId: string | null; // exactly one of productId/category is set
-  category: ProductCategory | null;
+  categoryId: string | null;
+  category?: Category | null;
   discountType: DiscountType;
   discountValue: string; // DECIMAL — string
   recipientLabel: string | null;
@@ -341,7 +365,7 @@ export interface DiscountCode {
 export interface GenerateDiscountCodesInput {
   count: number; // 1–500
   productId?: string;
-  category?: ProductCategory;
+  categoryId?: string;
   discountType: DiscountType;
   discountValue: number;
   expiresInDays?: number; // 1–90

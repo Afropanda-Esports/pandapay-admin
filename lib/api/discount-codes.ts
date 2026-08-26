@@ -4,7 +4,6 @@ import type {
   DiscountCodeStatus,
   GenerateDiscountCodesInput,
   PaginatedResponse,
-  ProductCategory,
 } from '@/lib/types';
 
 export function listDiscountCodes(
@@ -12,12 +11,12 @@ export function listDiscountCodes(
   limit = 20,
   status?: DiscountCodeStatus,
   productId?: string,
-  category?: ProductCategory,
+  categoryId?: string,
 ) {
   const q = new URLSearchParams({ page: String(page), limit: String(limit) });
   if (status) q.set('status', status);
   if (productId) q.set('productId', productId);
-  if (category) q.set('category', category);
+  if (categoryId) q.set('categoryId', categoryId);
   return apiFetch<PaginatedResponse<DiscountCode>>(`/admin/discount-codes?${q}`);
 }
 

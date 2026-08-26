@@ -29,22 +29,16 @@ import {
 } from '@/components/ui/select';
 import { ApiError } from '@/lib/api/client';
 import { getCurrentRate } from '@/lib/api/pricing';
-import { createProduct } from '@/lib/api/products';
-import { PRODUCT_CATEGORY_OPTIONS } from '@/lib/product-categories';
-import type { PricingMode, ProductCategory } from '@/lib/types';
-
-const categoryValues = [
-  'GIFT_CARD',
-  'GAME_TOP_UP',
-  'AIRTIME',
-  'CONSOLE_VOUCHER',
-  'ENTERTAINMENT',
-] as const satisfies readonly ProductCategory[];
+import { getProductBrands, getRegions, createProduct } from '@/lib/api/products';
+import { getCategories } from '@/lib/api/categories';
+import type { PricingMode } from '@/lib/types';
 
 const schema = z
   .object({
+    regionId: z.string().min(1, 'Select a region'),
+    brandId: z.string().min(1, 'Select a brand'),
     name: z.string().trim().min(2, 'Min 2 characters'),
-    category: z.enum(categoryValues),
+    categoryId: z.string().min(1, 'Select a category'),
     pricingMode: z.enum(['MANUAL_NGN', 'GLOBAL_FX']),
     manualPriceNgn: z.coerce.number().optional(),
     priceUsd: z.coerce.number().optional(),
@@ -85,11 +79,25 @@ export function CreateProductDialog() {
     staleTime: 60_000,
   });
 
+  const { data: regions } = useQuery({
+    queryKey: ['regions'],
+    queryFn: getRegions,
+    staleTime: 60_000,
+  });
+
+  const { data: categories } = useQuery({
+    queryKey: ['categories'],
+    queryFn: getCategories,
+    staleTime: 60_000,
+  });
+
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
+      regionId: '',
+      brandId: '',
       name: '',
-      category: undefined,
+      categoryId: '',
       pricingMode: 'MANUAL_NGN',
       manualPriceNgn: '' as unknown as number,
       priceUsd: '' as unknown as number,
@@ -98,6 +106,16 @@ export function CreateProductDialog() {
   });
 
   const pricingMode = form.watch('pricingMode') as PricingMode;
+  const watchRegionId = form.watch('regionId');
+  const watchCategoryId = form.watch('categoryId');
+
+  const { data: brands, isFetching: isFetchingBrands } = useQuery({
+    queryKey: ['product-brands', watchRegionId, watchCategoryId],
+    queryFn: () =>
+      getProductBrands(watchRegionId, watchCategoryId),
+    enabled: !!watchRegionId && !!watchCategoryId,
+    staleTime: 60_000,
+  });
 
   const mutation = useMutation({
     mutationFn: (data: z.output<typeof schema>) => {
@@ -108,16 +126,18 @@ export function CreateProductDialog() {
           );
         }
         return createProduct({
+          brandId: data.brandId,
           name: data.name,
-          category: data.category,
+          categoryId: data.categoryId,
           currency: data.currency,
           pricingMode: 'GLOBAL_FX',
           priceUsd: data.priceUsd,
         });
       }
       return createProduct({
+        brandId: data.brandId,
         name: data.name,
-        category: data.category,
+        categoryId: data.categoryId,
         currency: data.currency,
         pricingMode: 'MANUAL_NGN',
         manualPriceNgn: data.manualPriceNgn,
@@ -172,35 +192,56 @@ export function CreateProductDialog() {
         <form onSubmit={onSubmit} noValidate>
           <FieldGroup>
             <Field>
-              <FieldLabel htmlFor="product-name">Name</FieldLabel>
-              <Input
-                id="product-name"
-                placeholder="Steam Gift Card"
-                disabled={mutation.isPending}
-                {...form.register('name')}
+              <FieldLabel htmlFor="product-region">Region</FieldLabel>
+              <Controller
+                control={form.control}
+                name="regionId"
+                render={({ field }) => (
+                  <Select
+                    value={field.value}
+                    onValueChange={(v) => {
+                      field.onChange(v);
+                      form.setValue('brandId', ''); // reset brand
+                    }}
+                    disabled={mutation.isPending}
+                  >
+                    <SelectTrigger id="product-region" className="w-full">
+                      <SelectValue placeholder="Select a region" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {regions?.map((r) => (
+                        <SelectItem key={r.id} value={r.id}>
+                          {r.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               />
-              <FieldError>{form.formState.errors.name?.message}</FieldError>
+              <FieldError>{form.formState.errors.regionId?.message}</FieldError>
             </Field>
 
             <Field>
               <FieldLabel htmlFor="product-category">Category</FieldLabel>
               <Controller
                 control={form.control}
-                name="category"
+                name="categoryId"
                 render={({ field }) => (
                   <Select
-                    items={PRODUCT_CATEGORY_OPTIONS}
                     value={field.value ?? ''}
-                    onValueChange={(v) => field.onChange(v)}
+                    onValueChange={(v) => {
+                      field.onChange(v);
+                      form.setValue('brandId', ''); // reset brand
+                    }}
                     disabled={mutation.isPending}
                   >
                     <SelectTrigger id="product-category" className="w-full">
                       <SelectValue placeholder="Select a category" />
                     </SelectTrigger>
                     <SelectContent>
-                      {PRODUCT_CATEGORY_OPTIONS.map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value}>
-                          {opt.label}
+                      {(categories ?? []).map((opt) => (
+                        <SelectItem key={opt.id} value={opt.id}>
+                          {opt.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -208,8 +249,49 @@ export function CreateProductDialog() {
                 )}
               />
               <FieldError>
-                {form.formState.errors.category?.message}
+                {form.formState.errors.categoryId?.message}
               </FieldError>
+            </Field>
+
+            <Field>
+              <FieldLabel htmlFor="product-brand">Brand</FieldLabel>
+              <Controller
+                control={form.control}
+                name="brandId"
+                render={({ field }) => (
+                  <Select
+                    value={field.value}
+                    onValueChange={(v) => field.onChange(v)}
+                    disabled={mutation.isPending || !watchRegionId || !watchCategoryId || isFetchingBrands}
+                  >
+                    <SelectTrigger id="product-brand" className="w-full">
+                      <SelectValue placeholder={!watchRegionId || !watchCategoryId ? 'Select region & category first' : 'Select a brand'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {brands?.map((b) => (
+                        <SelectItem key={b.id} value={b.id}>
+                          {b.name}
+                        </SelectItem>
+                      ))}
+                      {brands?.length === 0 && (
+                        <div className="p-2 text-sm text-muted-foreground">No brands found</div>
+                      )}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              <FieldError>{form.formState.errors.brandId?.message}</FieldError>
+            </Field>
+
+            <Field>
+              <FieldLabel htmlFor="product-name">Denomination (e.g. $10)</FieldLabel>
+              <Input
+                id="product-name"
+                placeholder="$10"
+                disabled={mutation.isPending}
+                {...form.register('name')}
+              />
+              <FieldError>{form.formState.errors.name?.message}</FieldError>
             </Field>
 
             <Field>
