@@ -66,6 +66,8 @@ const ACTION_VALUES = [
   'ORDER_FAILED',
   'ORDER_REFUNDED',
   'UNMATCHED_PAYMENT',
+  'MANUAL_PAYMENT_CONFIRMED',
+  'MANUAL_PAYMENT_SETTINGS_UPDATED',
   'ORDER_EXPIRED',
   'ADMIN_RESEND',
   'ADMIN_WALLET_CREDIT',
@@ -101,6 +103,8 @@ const ACTION_LABEL: Record<AuditAction, string> = {
   ORDER_FAILED: 'Order failed',
   ORDER_REFUNDED: 'Order refunded',
   UNMATCHED_PAYMENT: 'Unmatched payment',
+  MANUAL_PAYMENT_CONFIRMED: 'Manual payment confirmed',
+  MANUAL_PAYMENT_SETTINGS_UPDATED: 'Manual payment settings updated',
   ORDER_EXPIRED: 'Order expired',
   ADMIN_RESEND: 'Admin resend',
   ADMIN_WALLET_CREDIT: 'Admin wallet credit',
@@ -141,6 +145,10 @@ const ACTION_STYLES: Record<AuditAction, string> = {
   ORDER_FAILED: 'bg-error-100 text-error-700 hover:bg-error-100',
   ORDER_REFUNDED: 'bg-warning-100 text-warning-700 hover:bg-warning-100',
   UNMATCHED_PAYMENT: 'bg-error-100 text-error-700 hover:bg-error-100',
+  MANUAL_PAYMENT_CONFIRMED:
+    'bg-success-100 text-success-700 hover:bg-success-100',
+  MANUAL_PAYMENT_SETTINGS_UPDATED:
+    'bg-warning-100 text-warning-700 hover:bg-warning-100',
   ORDER_EXPIRED: 'bg-neutral-100 text-neutral-500 hover:bg-neutral-100',
   ADMIN_RESEND: 'bg-info-100 text-info-700 hover:bg-info-100',
   ADMIN_WALLET_CREDIT: 'bg-success-100 text-success-700 hover:bg-success-100',

@@ -124,6 +124,7 @@ const PAYMENT_METHOD_LABEL: Record<
   WALLET: 'Wallet',
   REFUND: 'Refund',
   CRYPTO_USDC: 'USDC (crypto)',
+  MANUAL_BANK_TRANSFER: 'Manual bank transfer',
 };
 
 function PaymentModeBadge({ mode }: Readonly<{ mode: PaymentMode }>) {

@@ -13,6 +13,7 @@ import {
   AlertTriangle,
   Tag,
   FolderTree,
+  Landmark,
   type LucideIcon,
 } from 'lucide-react';
 import type { AdminPermission } from '@/lib/permissions';
@@ -34,6 +35,12 @@ export const NAV_ITEMS: NavItem[] = [
   { label: 'Regions', href: '/regions', icon: Globe, permission: 'products:view' },
   { label: 'Pricing', href: '/pricing', icon: Coins, permission: 'pricing:view' },
   { label: 'Fraud Review', href: '/fraud', icon: ShieldAlert, permission: 'fraud:view' },
+  {
+    label: 'Manual payments',
+    href: '/manual-payments',
+    icon: Landmark,
+    permission: 'orders:view',
+  },
   {
     label: 'Payment exceptions',
     href: '/payment-exceptions',

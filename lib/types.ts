@@ -23,6 +23,8 @@ export type AuditAction =
   | 'ORDER_FAILED'
   | 'ORDER_REFUNDED'
   | 'UNMATCHED_PAYMENT'
+  | 'MANUAL_PAYMENT_CONFIRMED'
+  | 'MANUAL_PAYMENT_SETTINGS_UPDATED'
   | 'ORDER_EXPIRED'
   | 'ADMIN_RESEND'
   | 'ADMIN_WALLET_CREDIT'
@@ -92,7 +94,8 @@ export type PaymentMethod =
   | 'BANK_TRANSFER'
   | 'WALLET'
   | 'REFUND'
-  | 'CRYPTO_USDC';
+  | 'CRYPTO_USDC'
+  | 'MANUAL_BANK_TRANSFER';
 
 export interface UserPayment {
   id: string;
@@ -167,6 +170,7 @@ export interface Order {
   productId: string;
   amount: string;
   paymentMode: PaymentMode;
+  paymentCollectionMode?: 'PAYSTACK_AUTO' | 'MANUAL_BANK_TRANSFER';
   status: OrderStatus;
   source?: OrderSource;
   paystackReference: string | null;
