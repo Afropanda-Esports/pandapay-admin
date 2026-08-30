@@ -1,0 +1,68 @@
+{
+  "project": "pandapay-admin",
+  "updated": "2026-08-30",
+  "legend": {
+    "status": ["FAIL", "PENDING_REVIEW", "PASS"],
+    "note": "FAIL = not done, broken, or rejected. PENDING_REVIEW = built and packet emitted, awaiting reviewer verdict. PASS = reviewed, approved, merged, and verified. The executor may set PENDING_REVIEW but NEVER PASS — PASS is set by the human/reviewer after approval.",
+    "priority": "lower number = higher priority; agent picks the highest-priority FAIL",
+    "id_convention": "ADMIN-FE-NNN — admin frontend features"
+  },
+  "features": [
+    {
+      "id": "ADMIN-FE-001",
+      "name": "BFF auth — HttpOnly cookie, login/logout, proxy guard",
+      "priority": 1,
+      "verify": "pnpm dev; POST /api/auth/login with valid creds sets admin_token; /dashboard loads; logout clears cookie",
+      "status": "PASS",
+      "notes": "app/api/auth/*, proxy.ts"
+    },
+    {
+      "id": "ADMIN-FE-002",
+      "name": "Core pages — dashboard, orders, users, products, audit, fraud",
+      "priority": 1,
+      "verify": "pnpm build; manual smoke on /dashboard, /orders, /users, /products, /audit, /fraud with pandapay-be running",
+      "status": "PASS",
+      "notes": "AGENTS.md backend routes section"
+    },
+    {
+      "id": "ADMIN-FE-003",
+      "name": "Pricing page — wired to live backend pricing routes",
+      "priority": 2,
+      "verify": "With BE ADMIN-002 pricing routes: /pricing loads FX + product pricing without 404",
+      "status": "FAIL",
+      "notes": "Blocked by pandapay-be ADMIN-002; lib/api/pricing.ts exists"
+    },
+    {
+      "id": "ADMIN-FE-004",
+      "name": "Team / admins page — invite and manage managers",
+      "priority": 2,
+      "verify": "Super Admin: /admins lists admins; invite flow returns 2xx",
+      "status": "FAIL",
+      "notes": "Blocked by pandapay-be ADMIN-002 admin users CRUD"
+    },
+    {
+      "id": "ADMIN-FE-005",
+      "name": "Change-password forced flow",
+      "priority": 2,
+      "verify": "Login with must_change_password → /change-password → POST succeeds",
+      "status": "FAIL",
+      "notes": "UI exists; BE change-password route may be missing"
+    },
+    {
+      "id": "ADMIN-FE-006",
+      "name": "Automated test baseline (lint + smoke or component tests)",
+      "priority": 3,
+      "verify": "pnpm test or pnpm verify script exits 0 in CI",
+      "status": "FAIL",
+      "notes": "No test runner configured yet — SETUP feedback floor gap"
+    },
+    {
+      "id": "ADMIN-FE-007",
+      "name": "Show ORD-003 FX markup on dashboard + order detail",
+      "priority": 2,
+      "verify": "node --experimental-strip-types --test lib/fx-markup-display.spec.ts && pnpm exec tsc --noEmit && pnpm lint && pnpm build",
+      "status": "PENDING_REVIEW",
+      "notes": "Contract: skills/.harness/contracts/ORD-003-FE.md. Branch feat/ord-003-fe-admin-fx-markup. Display-only FX markup on dashboard StatCard + order detail Pricing card. RED 2026-08-30: stub always returned em dash; assertion on \"0.00\" vs missing. GREEN: 6/6 node:test; tsc clean; lint 0 errors (pre-existing warnings); API_URL=http://localhost:3000 pnpm build green. No client-side markup math."
+    }
+  ]
+}

@@ -1,7 +1,15 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, RefreshCw, ShoppingBag, Ticket, Users, Wallet } from 'lucide-react';
+import {
+  AlertCircle,
+  Percent,
+  RefreshCw,
+  ShoppingBag,
+  Ticket,
+  Users,
+  Wallet,
+} from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -24,6 +32,7 @@ import { createPurchase } from '@/lib/api/orders';
 import { getProducts } from '@/lib/api/products';
 import { getStats } from '@/lib/api/stats';
 import { getUserDirectory } from '@/lib/api/users';
+import { formatFxMarkupNgn } from '@/lib/fx-markup-display';
 import type { PaymentMode } from '@/lib/types';
 
 const formatNgn = (n: number) => `₦${n.toLocaleString('en-NG')}`;
@@ -304,7 +313,22 @@ export default function DashboardPage() {
           }
           isLoading={isLoading}
         />
+        <StatCard
+          icon={Percent}
+          label="FX markup"
+          value={data ? formatFxMarkupNgn(data.revenue.fxMarkupNgn) : '—'}
+          subtitle={
+            data
+              ? `${formatFxMarkupNgn(data.revenue.last7DaysFxMarkupNgn)} this week`
+              : undefined
+          }
+          isLoading={isLoading}
+        />
       </div>
+      <p className="mt-2 text-xs text-muted-foreground">
+        FX markup is the FX spread on fulfilled GLOBAL_FX orders — not wholesale
+        profit or Paystack fees.
+      </p>
 
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>

@@ -32,6 +32,14 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ApiError } from '@/lib/api/client';
 import { usePermissions } from '@/hooks/use-permissions';
 import { getOrder, resendOrder, fulfillOrder, refundOrder, retryOrder } from '@/lib/api/orders';
+import {
+  formatFxMarkupNgn,
+  formatMarkupBps,
+  formatOracleNgnPerUsd,
+  formatPriceUsd,
+  formatPricingMode,
+  formatRateSnapshot,
+} from '@/lib/fx-markup-display';
 import { formatOrderSource } from '@/lib/order-source';
 import type { OrderDetail, PaymentMode } from '@/lib/types';
 
@@ -141,7 +149,7 @@ function DetailSkeleton() {
     <div className="space-y-4">
       <Skeleton className="h-7 w-64" />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {['o', 'p', 'u', 'v'].map((k) => (
+        {['o', 'p', 'pr', 'u', 'v'].map((k) => (
           <Card key={k}>
             <CardHeader>
               <Skeleton className="h-5 w-28" />
@@ -199,9 +207,6 @@ function PaymentInfo({ order }: Readonly<{ order: OrderDetail }>) {
           }
         />
       )}
-      {order.rateSnapshot && (
-        <DetailRow label="Rate snapshot" value={order.rateSnapshot} />
-      )}
       <DetailRow
         label="Voucher assigned"
         value={order.voucherAssigned ? 'Yes' : 'No'}
@@ -210,6 +215,28 @@ function PaymentInfo({ order }: Readonly<{ order: OrderDetail }>) {
         label="Voucher used"
         value={order.voucherIsUsed ? 'Yes' : 'No'}
       />
+    </InfoCard>
+  );
+}
+
+function PricingInfo({ order }: Readonly<{ order: OrderDetail }>) {
+  return (
+    <InfoCard title="Pricing">
+      <DetailRow
+        label="Pricing mode"
+        value={formatPricingMode(order.pricingMode)}
+      />
+      <DetailRow label="Face value (USD)" value={formatPriceUsd(order.priceUsd)} />
+      <DetailRow label="Markup" value={formatMarkupBps(order.markupBps)} />
+      <DetailRow
+        label="Oracle NGN/USD"
+        value={formatOracleNgnPerUsd(order.oracleNgnPerUsd)}
+      />
+      <DetailRow
+        label="Rate snapshot"
+        value={formatRateSnapshot(order.rateSnapshot)}
+      />
+      <DetailRow label="FX markup" value={formatFxMarkupNgn(order.fxMarkupNgn)} />
     </InfoCard>
   );
 }
@@ -505,6 +532,7 @@ export default function OrderDetailPage({
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <OrderInfo order={order} />
+        <PricingInfo order={order} />
         <PaymentInfo order={order} />
         <PaymentTimelineCard order={order} />
         <UserInfo order={order} />
