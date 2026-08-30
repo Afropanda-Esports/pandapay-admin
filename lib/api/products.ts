@@ -6,6 +6,7 @@ import type {
   VoucherStats,
   Region,
   ProductBrand,
+  ProductLine,
 } from '@/lib/types';
 
 export const getRegions = () => apiFetch<Region[]>('/admin/regions');
@@ -30,6 +31,26 @@ export const getProductBrands = (regionId?: string, categoryId?: string) => {
   return apiFetch<ProductBrand[]>(`/admin/product-brands${q ? `?${q}` : ''}`);
 };
 
+export const getProductLines = (brandId?: string) => {
+  const q = brandId ? `?brandId=${brandId}` : '';
+  return apiFetch<ProductLine[]>(`/admin/product-lines${q}`);
+};
+
+export const createProductLine = (body: { brandId: string; name: string }) =>
+  apiFetch<ProductLine>('/admin/product-lines', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+
+export const updateProductLine = (
+  id: string,
+  body: { name?: string; isActive?: boolean },
+) =>
+  apiFetch<ProductLine>(`/admin/product-lines/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+
 export const getProducts = (categoryId?: string) =>
   apiFetch<ProductWithStats[]>(
     `/admin/products${categoryId ? `?categoryId=${categoryId}` : ''}`,
@@ -40,6 +61,7 @@ export const getProduct = (id: string) =>
 
 export const createProduct = (body: {
   brandId: string;
+  lineId: string;
   name: string;
   categoryId: string;
   currency?: string;

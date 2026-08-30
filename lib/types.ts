@@ -252,6 +252,14 @@ export interface ProductBrand {
   createdAt: string;
 }
 
+export interface ProductLine {
+  id: string;
+  brandId: string;
+  name: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
 export interface VoucherStats {
   total: number;
   available: number;
@@ -261,6 +269,7 @@ export interface VoucherStats {
 export interface Product {
   id: string;
   brandId: string;
+  lineId: string;
   name: string;
   categoryId: string;
   category?: Category;
