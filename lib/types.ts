@@ -79,6 +79,9 @@ export interface Stats {
   revenue: {
     totalNgn: number;
     last7DaysNgn: number;
+    /** SUM(fx_markup_ngn) of FULFILLED orders — 2 dp string. Absent on pre-ORD-003 APIs. */
+    fxMarkupNgn?: string;
+    last7DaysFxMarkupNgn?: string;
   };
   vouchers: {
     total: number;
@@ -178,6 +181,12 @@ export interface Order {
   createdAt: string;
   product?: OrderProductRef;
   user?: OrderUserRef;
+  /** Product pricing mode frozen at checkout. Null on pre-ORD-003 rows. */
+  pricingMode?: PricingMode | null;
+  priceUsd?: string | null;
+  markupBps?: number | null;
+  oracleNgnPerUsd?: string | null;
+  fxMarkupNgn?: string | null;
 }
 
 export interface PaymentTimelineEntry {
