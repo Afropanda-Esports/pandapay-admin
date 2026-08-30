@@ -14,6 +14,7 @@ import {
   Tag,
   FolderTree,
   Landmark,
+  LifeBuoy,
   type LucideIcon,
 } from 'lucide-react';
 import type { AdminPermission } from '@/lib/permissions';
@@ -45,6 +46,12 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'Payment exceptions',
     href: '/payment-exceptions',
     icon: AlertTriangle,
+    permission: 'orders:view',
+  },
+  {
+    label: 'Support requests',
+    href: '/support-requests',
+    icon: LifeBuoy,
     permission: 'orders:view',
   },
   { label: 'Feature Flags', href: '/feature-flags', icon: Flag, permission: 'feature-flags:view' },

@@ -63,6 +63,14 @@
       "verify": "node --experimental-strip-types --test lib/fx-markup-display.spec.ts && pnpm exec tsc --noEmit && pnpm lint && pnpm build",
       "status": "PENDING_REVIEW",
       "notes": "Contract: skills/.harness/contracts/ORD-003-FE.md. Branch feat/ord-003-fe-admin-fx-markup. Display-only FX markup on dashboard StatCard + order detail Pricing card. RED 2026-08-30: stub always returned em dash; assertion on \"0.00\" vs missing. GREEN: 6/6 node:test; tsc clean; lint 0 errors (pre-existing warnings); API_URL=http://localhost:3000 pnpm build green. No client-side markup math."
+    },
+    {
+      "id": "ADMIN-FE-008",
+      "name": "Support requests queue — list and resolve WhatsApp tickets",
+      "priority": 2,
+      "verify": "node --experimental-strip-types --test lib/api/support-requests.spec.ts && pnpm exec tsc --noEmit && pnpm lint && pnpm build",
+      "status": "PENDING_REVIEW",
+      "notes": "Contract: skills/.harness/contracts/SUPPORT-001-FE.md — EXECUTED 2026-08-30. Support queue page + resolve dialog mirroring payment-exceptions. Branch feat/support-001-fe-admin-support-queue. VERIFY: 2/2 node:test, tsc+lint+build green."
     }
   ]
 }

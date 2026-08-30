@@ -231,6 +231,22 @@ export interface PaymentException {
   updatedAt: string;
 }
 
+export type SupportRequestStatus = 'OPEN' | 'RESOLVED';
+
+export interface SupportRequest {
+  id: string;
+  userId: string;
+  whatsappNumber: string;
+  orderId: string | null;
+  issueDescription: string;
+  status: SupportRequestStatus;
+  resolvedAt: string | null;
+  resolvedBy: string | null;
+  resolutionNote: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // ─── Products ─────────────────────────────────────────────────────────────────
 
 export interface Region {
