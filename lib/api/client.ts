@@ -61,5 +61,11 @@ export async function apiFetch<T>(
   }
 
   if (res.status === 204) return undefined as T;
-  return res.json() as Promise<T>;
+
+  // A 200 with an empty body happens whenever a controller returns `null`
+  // (e.g. "no settings saved yet") — NestJS/Express send that as a genuinely
+  // empty response rather than the JSON literal `null`, so res.json() would
+  // throw "Unexpected end of JSON input" here.
+  const text = await res.text();
+  return (text ? JSON.parse(text) : null) as T;
 }
