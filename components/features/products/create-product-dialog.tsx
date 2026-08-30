@@ -29,7 +29,12 @@ import {
 } from '@/components/ui/select';
 import { ApiError } from '@/lib/api/client';
 import { getCurrentRate } from '@/lib/api/pricing';
-import { getProductBrands, getRegions, createProduct } from '@/lib/api/products';
+import {
+  getProductBrands,
+  getProductLines,
+  getRegions,
+  createProduct,
+} from '@/lib/api/products';
 import { getCategories } from '@/lib/api/categories';
 import type { PricingMode } from '@/lib/types';
 
@@ -37,6 +42,7 @@ const schema = z
   .object({
     regionId: z.string().min(1, 'Select a region'),
     brandId: z.string().min(1, 'Select a brand'),
+    lineId: z.string().min(1, 'Select a product line'),
     name: z.string().trim().min(2, 'Min 2 characters'),
     categoryId: z.string().min(1, 'Select a category'),
     pricingMode: z.enum(['MANUAL_NGN', 'GLOBAL_FX']),
@@ -96,6 +102,7 @@ export function CreateProductDialog() {
     defaultValues: {
       regionId: '',
       brandId: '',
+      lineId: '',
       name: '',
       categoryId: '',
       pricingMode: 'MANUAL_NGN',
@@ -108,12 +115,20 @@ export function CreateProductDialog() {
   const pricingMode = form.watch('pricingMode') as PricingMode;
   const watchRegionId = form.watch('regionId');
   const watchCategoryId = form.watch('categoryId');
+  const watchBrandId = form.watch('brandId');
 
   const { data: brands, isFetching: isFetchingBrands } = useQuery({
     queryKey: ['product-brands', watchRegionId, watchCategoryId],
     queryFn: () =>
       getProductBrands(watchRegionId, watchCategoryId),
     enabled: !!watchRegionId && !!watchCategoryId,
+    staleTime: 60_000,
+  });
+
+  const { data: lines, isFetching: isFetchingLines } = useQuery({
+    queryKey: ['product-lines', watchBrandId],
+    queryFn: () => getProductLines(watchBrandId),
+    enabled: !!watchBrandId,
     staleTime: 60_000,
   });
 
@@ -127,6 +142,7 @@ export function CreateProductDialog() {
         }
         return createProduct({
           brandId: data.brandId,
+          lineId: data.lineId,
           name: data.name,
           categoryId: data.categoryId,
           currency: data.currency,
@@ -136,6 +152,7 @@ export function CreateProductDialog() {
       }
       return createProduct({
         brandId: data.brandId,
+        lineId: data.lineId,
         name: data.name,
         categoryId: data.categoryId,
         currency: data.currency,
@@ -202,6 +219,7 @@ export function CreateProductDialog() {
                     onValueChange={(v) => {
                       field.onChange(v);
                       form.setValue('brandId', ''); // reset brand
+                      form.setValue('lineId', ''); // reset line
                     }}
                     disabled={mutation.isPending}
                   >
@@ -232,6 +250,7 @@ export function CreateProductDialog() {
                     onValueChange={(v) => {
                       field.onChange(v);
                       form.setValue('brandId', ''); // reset brand
+                      form.setValue('lineId', ''); // reset line
                     }}
                     disabled={mutation.isPending}
                   >
@@ -261,7 +280,10 @@ export function CreateProductDialog() {
                 render={({ field }) => (
                   <Select
                     value={field.value}
-                    onValueChange={(v) => field.onChange(v)}
+                    onValueChange={(v) => {
+                      field.onChange(v);
+                      form.setValue('lineId', ''); // reset line
+                    }}
                     disabled={mutation.isPending || !watchRegionId || !watchCategoryId || isFetchingBrands}
                   >
                     <SelectTrigger id="product-brand" className="w-full">
@@ -281,6 +303,46 @@ export function CreateProductDialog() {
                 )}
               />
               <FieldError>{form.formState.errors.brandId?.message}</FieldError>
+            </Field>
+
+            <Field>
+              <FieldLabel htmlFor="product-line">Product line</FieldLabel>
+              <Controller
+                control={form.control}
+                name="lineId"
+                render={({ field }) => (
+                  <Select
+                    value={field.value}
+                    onValueChange={(v) => field.onChange(v)}
+                    disabled={
+                      mutation.isPending || !watchBrandId || isFetchingLines
+                    }
+                  >
+                    <SelectTrigger id="product-line" className="w-full">
+                      <SelectValue
+                        placeholder={
+                          !watchBrandId
+                            ? 'Select a brand first'
+                            : 'Select a product line'
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {lines?.map((l) => (
+                        <SelectItem key={l.id} value={l.id}>
+                          {l.name}
+                        </SelectItem>
+                      ))}
+                      {lines?.length === 0 && (
+                        <div className="p-2 text-sm text-muted-foreground">
+                          No lines found — create one for this brand first
+                        </div>
+                      )}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              <FieldError>{form.formState.errors.lineId?.message}</FieldError>
             </Field>
 
             <Field>
