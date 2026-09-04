@@ -1,19 +1,46 @@
 import { apiFetch } from './client';
-import type { Order, PaginatedResponse } from '@/lib/types';
+export interface ManualPaymentQueueRow {
+  orderRef: string;
+  customerPhone: string | null;
+  productName: string;
+  expectedAmount: string;
+  netReceived: string;
+  paymentCount: number;
+  settlement: string;
+  attemptStatus: string;
+  bankReference: string | null;
+  claimedAt: string | null;
+  expiresAt: string;
+  createdAt: string;
+}
 
-export const listManualPayments = (page = 1, limit = 20) =>
-  apiFetch<Pick<PaginatedResponse<Order>, 'data' | 'total'>>(
-    `/admin/manual-payments?page=${page}&limit=${limit}`,
+export interface ManualPaymentFilters {
+  status?: string;
+  settlement?: string;
+  orderRef?: string;
+  phoneSuffix?: string;
+  bankReference?: string;
+}
+
+export const listManualPayments = (page = 1, limit = 20, filters: ManualPaymentFilters = {}) => {
+  const query = new URLSearchParams({ page: String(page), limit: String(limit) });
+  Object.entries(filters).forEach(([key, value]) => value && query.set(key, value));
+  return apiFetch<{ data: ManualPaymentQueueRow[]; total: number; page: number; limit: number }>(
+    `/admin/manual-payments?${query}`,
   );
+};
 
 export const confirmManualPayment = (
   orderId: string,
-  input: { amountNaira: string; bankReference: string; note?: string },
+  input: { amountNaira: string; bankReference: string; note?: string; decisionContext: string },
 ) =>
-  apiFetch<{ status: 'confirmed' | 'already_confirmed' }>(
+  apiFetch<{ status: 'confirmed' | 'underpaid' | 'already_confirmed'; outstanding?: string; excess?: string }>(
     `/admin/manual-payments/${orderId}/confirm`,
     { method: 'POST', body: JSON.stringify(input) },
   );
+
+export const retryManualSettlement = (orderRef: string) =>
+  apiFetch<{ status: string }>(`/admin/manual-payments/${orderRef}/retry-settlement`, { method: 'POST' });
 
 export interface ManualPaymentBank { code: string; name: string }
 export interface ManualPaymentSettings {

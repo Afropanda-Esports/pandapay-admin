@@ -14,10 +14,12 @@ export function ConfirmManualPaymentDialog({ orderId, amount, onConfirmed, trigg
   const [open, setOpen] = useState(false);
   const [reference, setReference] = useState('');
   const [note, setNote] = useState('');
+  const [observedAmount, setObservedAmount] = useState(amount);
   const mutation = useMutation({
-    mutationFn: () => confirmManualPayment(orderId, { amountNaira: amount, bankReference: reference.trim(), note: note.trim() || undefined }),
-    onSuccess: ({ status }) => {
-      toast.success(status === 'confirmed' ? 'Payment confirmed and order settled' : 'Payment was already confirmed');
+    mutationFn: () => confirmManualPayment(orderId, { amountNaira: observedAmount, bankReference: reference.trim(), note: note.trim() || undefined, decisionContext: note.trim() || 'Bank statement credit independently verified' }),
+    onSuccess: ({ status, outstanding, excess }) => {
+      const message = status === 'underpaid' ? `Partial payment recorded; ₦${outstanding} remains` : excess ? `Settled; ₦${excess} refund follow-up created` : status === 'confirmed' ? 'Payment confirmed and order settled' : 'Payment was already confirmed';
+      toast.success(message);
       setOpen(false);
       setReference('');
       setNote('');
@@ -36,17 +38,21 @@ export function ConfirmManualPaymentDialog({ orderId, amount, onConfirmed, trigg
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-2">
+            <Label htmlFor="observed-amount">Observed amount credited (NGN)</Label>
+            <Input id="observed-amount" inputMode="decimal" value={observedAmount} onChange={(event) => setObservedAmount(event.target.value)} />
+          </div>
+          <div className="space-y-2">
             <Label htmlFor="bank-reference">Bank transaction reference</Label>
             <Input id="bank-reference" value={reference} onChange={(event) => setReference(event.target.value)} maxLength={100} placeholder="Unique bank reference" />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="confirmation-note">Note (optional)</Label>
-            <Input id="confirmation-note" value={note} onChange={(event) => setNote(event.target.value)} maxLength={500} placeholder="Verification context" />
+            <Label htmlFor="confirmation-note">Decision context</Label>
+            <Input id="confirmation-note" value={note} onChange={(event) => setNote(event.target.value)} maxLength={500} placeholder="How the bank credit was verified" />
           </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)} disabled={mutation.isPending}>Cancel</Button>
-          <Button onClick={() => mutation.mutate()} disabled={mutation.isPending || reference.trim().length < 2}>{mutation.isPending ? 'Settling…' : `Confirm ₦${Number(amount).toLocaleString('en-NG')}`}</Button>
+          <Button onClick={() => mutation.mutate()} disabled={mutation.isPending || reference.trim().length < 2 || Number(observedAmount) <= 0}>{mutation.isPending ? 'Settling…' : `Record ₦${Number(observedAmount).toLocaleString('en-NG')}`}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
