@@ -39,8 +39,15 @@ export default function ManualPaymentsPage() {
   </div>;
 }
 
+const TERMINAL_ATTEMPT_STATUSES = new Set(['CONFIRMED', 'REJECTED', 'EXPIRED']);
+
 function ManualPaymentCard({ order, canManage, onConfirmed }: Readonly<{ order: ManualPaymentQueueRow; canManage: boolean; onConfirmed: () => void }>) {
   const expired = order.expiresAt ? new Date(order.expiresAt) <= new Date() : false;
+  // A CONFIRMED/REJECTED/EXPIRED attempt has nothing left to verify — the
+  // button used to stay regardless of status (only `expired`, the order's
+  // own expiry timestamp, gated it), so an already-settled row still showed
+  // "Verify / record credit".
+  const canVerify = canManage && !expired && !TERMINAL_ATTEMPT_STATUSES.has(order.attemptStatus);
   const retry = useMutation({ mutationFn: () => retryManualSettlement(order.orderRef), onSuccess: onConfirmed });
   return <Card>
     <CardHeader className="flex flex-row items-start justify-between gap-4">
@@ -50,7 +57,7 @@ function ManualPaymentCard({ order, canManage, onConfirmed }: Readonly<{ order: 
     <CardContent className="space-y-3 text-sm">
       <p className="text-lg font-semibold">₦{Number(order.netReceived).toLocaleString('en-NG')} / ₦{Number(order.expectedAmount).toLocaleString('en-NG')}</p>
       <p>{order.customerPhone ?? 'Customer'}{order.senderName ? ` · From ${order.senderName}` : order.bankReference ? ` · Ref ${order.bankReference}` : ''}</p>
-      <div className="flex gap-2">{canManage && !expired ? <ConfirmManualPaymentDialog orderId={order.orderRef} amount={order.expectedAmount} senderName={order.senderName} onConfirmed={onConfirmed} trigger={<Button size="sm">Verify / record credit</Button>} /> : null}{canManage && order.paymentCount > 0 ? <Button size="sm" variant="outline" disabled={retry.isPending} onClick={() => retry.mutate()}>Retry settlement</Button> : null}</div>
+      <div className="flex gap-2">{canVerify ? <ConfirmManualPaymentDialog orderId={order.orderRef} amount={order.expectedAmount} senderName={order.senderName} onConfirmed={onConfirmed} trigger={<Button size="sm">Verify / record credit</Button>} /> : null}{canManage && order.paymentCount > 0 ? <Button size="sm" variant="outline" disabled={retry.isPending} onClick={() => retry.mutate()}>Retry settlement</Button> : null}</div>
     </CardContent>
   </Card>;
 }

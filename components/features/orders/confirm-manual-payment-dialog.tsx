@@ -49,6 +49,7 @@ export function ConfirmManualPaymentDialog({ orderId, amount, senderName, onConf
           <div className="space-y-2">
             <Label htmlFor="bank-reference">Bank transaction reference</Label>
             <Input id="bank-reference" value={reference} onChange={(event) => setReference(event.target.value)} maxLength={100} placeholder="Unique bank reference" />
+            <p className="text-xs text-muted-foreground">The reference from your own bank statement for this credit — not something the customer provided. Used to stop the same credit from being recorded twice.</p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="confirmation-note">Decision context</Label>
