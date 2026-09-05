@@ -3,7 +3,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Copy, Plus } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -31,6 +31,7 @@ import { ApiError } from '@/lib/api/client';
 import { generateDiscountCodes } from '@/lib/api/discount-codes';
 import { getProducts } from '@/lib/api/products';
 import { getCategories } from '@/lib/api/categories';
+import { toSelectItems } from '@/lib/select-items';
 import type { DiscountCode } from '@/lib/types';
 
 const DISCOUNT_TYPE_OPTIONS = [
@@ -87,6 +88,15 @@ export function GenerateDiscountCodesDialog() {
     queryFn: getCategories,
     staleTime: 60_000,
   });
+
+  const productSelectItems = useMemo(
+    () => toSelectItems(products),
+    [products],
+  );
+  const categorySelectItems = useMemo(
+    () => toSelectItems(categories),
+    [categories],
+  );
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -200,6 +210,7 @@ export function GenerateDiscountCodesDialog() {
                     name="productId"
                     render={({ field }) => (
                       <Select
+                        items={productSelectItems}
                         value={field.value ?? ''}
                         onValueChange={(v) => field.onChange(v)}
                         disabled={mutation.isPending}
@@ -227,6 +238,7 @@ export function GenerateDiscountCodesDialog() {
                     name="categoryId"
                     render={({ field }) => (
                       <Select
+                        items={categorySelectItems}
                         value={field.value ?? ''}
                         onValueChange={(v) => field.onChange(v)}
                         disabled={mutation.isPending}

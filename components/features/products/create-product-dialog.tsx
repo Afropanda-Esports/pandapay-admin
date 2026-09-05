@@ -3,7 +3,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -36,6 +36,7 @@ import {
   createProduct,
 } from '@/lib/api/products';
 import { getCategories } from '@/lib/api/categories';
+import { toSelectItems } from '@/lib/select-items';
 import type { PricingMode } from '@/lib/types';
 
 const schema = z
@@ -97,6 +98,12 @@ export function CreateProductDialog() {
     staleTime: 60_000,
   });
 
+  const regionSelectItems = useMemo(() => toSelectItems(regions), [regions]);
+  const categorySelectItems = useMemo(
+    () => toSelectItems(categories),
+    [categories],
+  );
+
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -131,6 +138,9 @@ export function CreateProductDialog() {
     enabled: !!watchBrandId,
     staleTime: 60_000,
   });
+
+  const brandSelectItems = useMemo(() => toSelectItems(brands), [brands]);
+  const lineSelectItems = useMemo(() => toSelectItems(lines), [lines]);
 
   const mutation = useMutation({
     mutationFn: (data: z.output<typeof schema>) => {
@@ -215,6 +225,7 @@ export function CreateProductDialog() {
                 name="regionId"
                 render={({ field }) => (
                   <Select
+                    items={regionSelectItems}
                     value={field.value}
                     onValueChange={(v) => {
                       field.onChange(v);
@@ -246,6 +257,7 @@ export function CreateProductDialog() {
                 name="categoryId"
                 render={({ field }) => (
                   <Select
+                    items={categorySelectItems}
                     value={field.value ?? ''}
                     onValueChange={(v) => {
                       field.onChange(v);
@@ -279,6 +291,7 @@ export function CreateProductDialog() {
                 name="brandId"
                 render={({ field }) => (
                   <Select
+                    items={brandSelectItems}
                     value={field.value}
                     onValueChange={(v) => {
                       field.onChange(v);
@@ -312,6 +325,7 @@ export function CreateProductDialog() {
                 name="lineId"
                 render={({ field }) => (
                   <Select
+                    items={lineSelectItems}
                     value={field.value}
                     onValueChange={(v) => field.onChange(v)}
                     disabled={

@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:unit": "node --experimental-strip-types --test lib/fx-markup-display.spec.ts lib/api/support-requests.spec.ts"
+    "test:unit": "node --experimental-strip-types --test lib/fx-markup-display.spec.ts lib/api/support-requests.spec.ts lib/select-items.spec.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",
