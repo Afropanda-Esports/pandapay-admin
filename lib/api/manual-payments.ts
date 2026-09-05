@@ -8,6 +8,10 @@ export interface ManualPaymentQueueRow {
   paymentCount: number;
   settlement: string;
   attemptStatus: string;
+  /** PAY-018: the name on the sending bank account, as reported by the
+   * customer — replaces `bankReference` for new claims (kept below for
+   * historical rows from before the switch). */
+  senderName: string | null;
   bankReference: string | null;
   claimedAt: string | null;
   expiresAt: string;
@@ -20,6 +24,7 @@ export interface ManualPaymentFilters {
   orderRef?: string;
   phoneSuffix?: string;
   bankReference?: string;
+  senderName?: string;
 }
 
 export const listManualPayments = (page = 1, limit = 20, filters: ManualPaymentFilters = {}) => {
