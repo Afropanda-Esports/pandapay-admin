@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { ApiError } from '@/lib/api/client';
 import { confirmManualPayment } from '@/lib/api/manual-payments';
 
-export function ConfirmManualPaymentDialog({ orderId, amount, onConfirmed, trigger }: Readonly<{ orderId: string; amount: string; onConfirmed: () => void; trigger: React.ReactNode }>) {
+export function ConfirmManualPaymentDialog({ orderId, amount, senderName, onConfirmed, trigger }: Readonly<{ orderId: string; amount: string; senderName?: string | null; onConfirmed: () => void; trigger: React.ReactNode }>) {
   const [open, setOpen] = useState(false);
   const [reference, setReference] = useState('');
   const [note, setNote] = useState('');
@@ -37,6 +37,11 @@ export function ConfirmManualPaymentDialog({ orderId, amount, onConfirmed, trigg
           <DialogDescription>Verify the exact credit of ₦{Number(amount).toLocaleString('en-NG')} in the platform bank account. This immediately starts order settlement.</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
+          {senderName ? (
+            <p className="rounded-md bg-muted px-3 py-2 text-sm">
+              Customer claims this was sent by <span className="font-medium">{senderName}</span> — cross-check against the name on the credit in your bank statement.
+            </p>
+          ) : null}
           <div className="space-y-2">
             <Label htmlFor="observed-amount">Observed amount credited (NGN)</Label>
             <Input id="observed-amount" inputMode="decimal" value={observedAmount} onChange={(event) => setObservedAmount(event.target.value)} />

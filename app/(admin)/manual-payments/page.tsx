@@ -50,7 +50,7 @@ function ManualPaymentCard({ order, canManage, onConfirmed }: Readonly<{ order: 
     <CardContent className="space-y-3 text-sm">
       <p className="text-lg font-semibold">₦{Number(order.netReceived).toLocaleString('en-NG')} / ₦{Number(order.expectedAmount).toLocaleString('en-NG')}</p>
       <p>{order.customerPhone ?? 'Customer'}{order.senderName ? ` · From ${order.senderName}` : order.bankReference ? ` · Ref ${order.bankReference}` : ''}</p>
-      <div className="flex gap-2">{canManage && !expired ? <ConfirmManualPaymentDialog orderId={order.orderRef} amount={order.expectedAmount} onConfirmed={onConfirmed} trigger={<Button size="sm">Verify / record credit</Button>} /> : null}{canManage && order.paymentCount > 0 ? <Button size="sm" variant="outline" disabled={retry.isPending} onClick={() => retry.mutate()}>Retry settlement</Button> : null}</div>
+      <div className="flex gap-2">{canManage && !expired ? <ConfirmManualPaymentDialog orderId={order.orderRef} amount={order.expectedAmount} senderName={order.senderName} onConfirmed={onConfirmed} trigger={<Button size="sm">Verify / record credit</Button>} /> : null}{canManage && order.paymentCount > 0 ? <Button size="sm" variant="outline" disabled={retry.isPending} onClick={() => retry.mutate()}>Retry settlement</Button> : null}</div>
     </CardContent>
   </Card>;
 }
