@@ -9,6 +9,14 @@
   },
   "features": [
     {
+      "id": "CAT-011-FE",
+      "name": "Remove catalog Create buttons — regions/categories/brands/lines/products are script-only",
+      "priority": 1,
+      "verify": "pnpm exec tsc --noEmit && pnpm lint && pnpm build",
+      "status": "PENDING_REVIEW",
+      "notes": "Contract: skills/.harness/contracts/CAT-011-FE.md — EXECUTED 2026-09-06 on feat/cat-011-fe-remove-catalog-create. Removed Create dialogs for region/category/brand/product-line/product. tsc/lint/build green. Executor did not self-PASS."
+    },
+    {
       "id": "ADMIN-FE-001",
       "name": "BFF auth — HttpOnly cookie, login/logout, proxy guard",
       "priority": 1,

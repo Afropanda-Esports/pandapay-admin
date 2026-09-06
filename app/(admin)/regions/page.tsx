@@ -12,7 +12,6 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getRegions } from '@/lib/api/products';
 import type { Region } from '@/lib/types';
-import { CreateRegionDialog } from './components/create-region-dialog';
 import { EditRegionDialog } from './components/edit-region-dialog';
 
 const SKELETON_ROW_KEYS = ['r1', 'r2', 'r3', 'r4', 'r5'];
@@ -128,8 +127,7 @@ function RegionsContent() {
     <div>
       <PageHeader
         title="Regions"
-        description="Manage geographic regions and currencies for your product catalog."
-        actions={<CreateRegionDialog />}
+        description="Geographic regions for the product catalog. New regions are added via deployment scripts so WhatsApp vocabulary can be updated alongside."
       />
 
       <RegionsBody
