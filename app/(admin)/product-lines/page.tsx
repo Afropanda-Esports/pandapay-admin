@@ -5,15 +5,18 @@ import { AlertCircle, RefreshCw } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
 import { CreateProductLineDialog } from '@/components/features/product-lines/create-product-line-dialog';
+import { DeleteCatalogRowDialog } from '@/components/features/catalog/delete-catalog-row-dialog';
 import { EmptyState } from '@/components/shared/empty-state';
 import { PageHeader } from '@/components/shared/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
+  deleteProductLine,
   getProductBrands,
   getProductLines,
   getRegions,
+  updateProductLine,
 } from '@/lib/api/products';
 import { brandLabel } from '@/lib/catalog-forms';
 
@@ -73,6 +76,7 @@ export default function ProductLinesPage() {
                 <th className="px-3 py-2 font-medium">Brand</th>
                 <th className="px-3 py-2 font-medium">Status</th>
                 <th className="px-3 py-2 font-medium">Created</th>
+                <th className="px-3 py-2 font-medium text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -96,6 +100,19 @@ export default function ProductLinesPage() {
                   </td>
                   <td className="px-3 py-2 text-xs text-muted-foreground">
                     {format(parseISO(line.createdAt), 'PP')}
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    <DeleteCatalogRowDialog
+                      name={line.name}
+                      noun="product line"
+                      onDelete={() => deleteProductLine(line.id)}
+                      alternative={{
+                        label: 'Deactivate it instead',
+                        run: () =>
+                          updateProductLine(line.id, { isActive: false }),
+                      }}
+                      invalidateKeys={[['product-lines']]}
+                    />
                   </td>
                 </tr>
               ))}
