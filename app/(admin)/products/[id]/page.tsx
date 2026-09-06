@@ -13,6 +13,8 @@ import { use } from 'react';
 import { toast } from 'sonner';
 
 import { PricingCard } from '@/components/features/products/pricing-card';
+import { ArchiveProductButton } from '@/components/features/products/archive-product-button';
+import { DeleteProductDialog } from '@/components/features/products/delete-product-dialog';
 import { RenameProductDialog } from '@/components/features/products/rename-product-dialog';
 import { UploadVouchersDialog } from '@/components/features/products/upload-vouchers-dialog';
 import { PageHeader } from '@/components/shared/page-header';
@@ -297,6 +299,14 @@ export default function ProductDetailPage({
               currentName={product.name}
             />
             <UploadVouchersDialog
+              productId={product.id}
+              productName={product.name}
+            />
+            <ArchiveProductButton
+              productId={product.id}
+              archivedAt={product.archivedAt}
+            />
+            <DeleteProductDialog
               productId={product.id}
               productName={product.name}
             />

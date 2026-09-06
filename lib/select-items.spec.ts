@@ -144,3 +144,82 @@ test('product mutations continue to submit ids rather than display labels', () =
     assert.equal(payload.categoryId, 'data.categoryId');
   }
 });
+
+
+/**
+ * CAT-004 shipped DELETE, archive and unarchive for products and no admin app
+ * ever called them — the capability existed and was unreachable. That is the
+ * same failure as the discount dialog, only quieter: nothing breaks, the button
+ * simply is not there. These assert the client actually wires all three.
+ */
+test('the product API client reaches every CAT-004 endpoint', () => {
+  const source = readFileSync('lib/api/products.ts', 'utf8');
+
+  assert.ok(/method:\s*'DELETE'/.test(source), 'no DELETE call for products');
+  assert.ok(source.includes('/archive'), 'no archive call');
+  assert.ok(source.includes('/unarchive'), 'no unarchive call');
+});
+
+/**
+ * CAT-007 dropped category from ProductBrand. The frontend type still declared
+ * it, so the compiler asserted a string for a field that is undefined at
+ * runtime — a lie someone could act on.
+ */
+test('the brand type does not claim fields the backend dropped', () => {
+  const types = readFileSync('lib/types.ts', 'utf8');
+  const brand = types.slice(
+    types.indexOf('export interface ProductBrand'),
+    types.indexOf('}', types.indexOf('export interface ProductBrand')),
+  );
+
+  assert.ok(!brand.includes('categoryId'), 'CAT-007 removed brand.categoryId');
+  assert.ok(!brand.includes('category?'), 'CAT-007 removed brand.category');
+});
+
+test('the product type knows about archiving', () => {
+  const types = readFileSync('lib/types.ts', 'utf8');
+  const product = types.slice(
+    types.indexOf('export interface Product {'),
+    types.indexOf('}', types.indexOf('export interface Product {')),
+  );
+
+  assert.ok(product.includes('archivedAt'), 'CAT-004 added products.archived_at');
+});
+
+
+/**
+ * The role gate is the visible half of a server-side control. It is easy to
+ * lose in a refactor and its absence looks like nothing at all, so it is
+ * asserted directly: delete is SUPER_ADMIN, archive is not.
+ */
+test('delete is gated on super admin, archive is not', () => {
+  const del = readFileSync(
+    'components/features/products/delete-product-dialog.tsx',
+    'utf8',
+  );
+  const arch = readFileSync(
+    'components/features/products/archive-product-button.tsx',
+    'utf8',
+  );
+
+  assert.ok(
+    /if \(!isSuperAdmin\) return null;/.test(del),
+    'delete must render only for a super admin',
+  );
+  assert.ok(!arch.includes('isSuperAdmin'), 'archive is reversible — ADMIN level');
+});
+
+/**
+ * A refused delete is the common case, not the edge case: any product with
+ * order history returns 409. The dialog must read that status and offer
+ * archiving, rather than dropping the admin at a dead end with a toast.
+ */
+test('a refused delete offers archiving instead of failing silently', () => {
+  const source = readFileSync(
+    'components/features/products/delete-product-dialog.tsx',
+    'utf8',
+  );
+
+  assert.ok(source.includes('err.status === 409'), 'must detect the refusal');
+  assert.ok(source.includes('archiveProduct'), 'must offer the working alternative');
+});

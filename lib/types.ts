@@ -261,8 +261,8 @@ export interface Region {
 export interface ProductBrand {
   id: string;
   regionId: string;
-  categoryId: string;
-  category?: Category;
+  // CAT-007: brands are region-scoped only. The category columns were dropped
+  // from the backend — a product carries its own category instead.
   name: string;
   isActive: boolean;
   createdAt: string;
@@ -296,6 +296,12 @@ export interface Product {
   manualPriceNgn: string | null;
   snapshotNgnPrice: string;
   snapshotAt: string;
+  /**
+   * CAT-004: when the product was retired, or null if it is still on sale.
+   * Deliberately separate from `isAvailable`, which means "out of stock for
+   * now" and gets flipped routinely.
+   */
+  archivedAt: string | null;
 }
 
 export interface ProductWithStats extends Product {

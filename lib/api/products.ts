@@ -23,10 +23,11 @@ export const updateRegion = (id: string, body: { name: string; isActive?: boolea
     body: JSON.stringify(body),
   });
 
-export const getProductBrands = (regionId?: string, categoryId?: string) => {
+// CAT-007 removed category scoping from brands; the backend ignores a
+// categoryId param, so passing one only made the query key churn.
+export const getProductBrands = (regionId?: string) => {
   const params = new URLSearchParams();
   if (regionId) params.append('regionId', regionId);
-  if (categoryId) params.append('categoryId', categoryId);
   const q = params.toString();
   return apiFetch<ProductBrand[]>(`/admin/product-brands${q ? `?${q}` : ''}`);
 };
@@ -64,6 +65,24 @@ export const updateProductLine = (
     method: 'PATCH',
     body: JSON.stringify(body),
   });
+
+/**
+ * CAT-004: the three endpoints that let a product leave the catalog.
+ *
+ * `deleteProduct` is SUPER_ADMIN-only and succeeds only when nothing
+ * references the product — the server answers 409 with what blocked it.
+ * Archiving is the reversible alternative and sits at ADMIN level.
+ */
+export const deleteProduct = (id: string) =>
+  apiFetch<{ deleted: true; deletedVouchers: number }>(`/admin/products/${id}`, {
+    method: 'DELETE',
+  });
+
+export const archiveProduct = (id: string) =>
+  apiFetch<Product>(`/admin/products/${id}/archive`, { method: 'POST' });
+
+export const unarchiveProduct = (id: string) =>
+  apiFetch<Product>(`/admin/products/${id}/unarchive`, { method: 'POST' });
 
 export const getProducts = (categoryId?: string) =>
   apiFetch<ProductWithStats[]>(
