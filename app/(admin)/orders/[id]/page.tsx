@@ -223,8 +223,10 @@ function PaymentInfo({ order }: Readonly<{ order: OrderDetail }>) {
 function PricingInfo({ order }: Readonly<{ order: OrderDetail }>) {
   return (
     <InfoCard title="Pricing">
+      {/* Only orders placed before PRICE-004 carry a pricing mode. Newer ones
+          render "—"; the markup and oracle rate below describe them fully. */}
       <DetailRow
-        label="Pricing mode"
+        label="Pricing mode (legacy)"
         value={formatPricingMode(order.pricingMode)}
       />
       <DetailRow label="Face value (USD)" value={formatPriceUsd(order.priceUsd)} />

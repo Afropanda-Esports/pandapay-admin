@@ -43,3 +43,15 @@ test('formatPricingMode labels', () => {
   assert.equal(formatPricingMode(null), '—');
   assert.equal(formatPricingMode(undefined), '—');
 });
+
+/**
+ * PRICE-004: new orders carry no pricing mode, but orders placed before it
+ * still do. Both must render — this is the console's only record of how a
+ * historical order was priced.
+ */
+test('formatPricingMode still reads historical orders, and renders new ones as missing', () => {
+  assert.equal(formatPricingMode('GLOBAL_FX'), 'GLOBAL_FX');
+  assert.equal(formatPricingMode('MANUAL_NGN'), 'Manual NGN');
+  assert.equal(formatPricingMode(null), '—');
+  assert.equal(formatPricingMode(undefined), '—');
+});

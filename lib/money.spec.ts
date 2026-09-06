@@ -3,7 +3,6 @@ import { test } from 'node:test';
 
 import {
   SUPPORTED_CURRENCIES,
-  baseCurrencyFor,
   formatMoney,
   isSupportedCurrency,
 } from './money.ts';
@@ -43,14 +42,9 @@ test('formatMoney refuses an unsupported currency rather than rendering it', () 
   );
 });
 
-test('baseCurrencyFor maps each pricing mode (D1a)', () => {
-  assert.equal(baseCurrencyFor('MANUAL_NGN'), 'NGN');
-  assert.equal(baseCurrencyFor('GLOBAL_FX'), 'USD');
-});
-
-// Mutation check: inverting the mapping must fail. If this test only checked
-// "returns a supported currency", an inverted map would still pass.
-test('baseCurrencyFor mapping is not inverted', () => {
-  assert.notEqual(baseCurrencyFor('MANUAL_NGN'), 'USD');
-  assert.notEqual(baseCurrencyFor('GLOBAL_FX'), 'NGN');
-});
+/**
+ * `baseCurrencyFor` is gone with PRICE-004. CUR-001-FE derived a product's
+ * currency from its pricing mode; the mode no longer exists, and currency now
+ * comes from the region, so there is no mapping left to invert. Its coverage
+ * moves to `lib/markup.spec.ts`, which guards the distinction that replaced it.
+ */

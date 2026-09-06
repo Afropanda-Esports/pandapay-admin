@@ -6,7 +6,6 @@ import {
   brandNameItems,
   catalogNameIssue,
   brandLabel,
-  usdPriceHelp,
 } from './catalog-forms.ts';
 
 /**
@@ -61,30 +60,6 @@ describe('catalogNameIssue', () => {
 
   it('measures the trimmed name, not the typed whitespace', () => {
     assert.equal(catalogNameIssue(`  ${'x'.repeat(CATALOG_NAME_MAX_LENGTH)}  `), null);
-  });
-});
-
-describe('usdPriceHelp', () => {
-  /**
-   * DISC-008 made price_usd mandatory in both modes, but it means different
-   * things in each: for GLOBAL_FX it drives the naira price, for MANUAL_NGN it
-   * is declared only. An admin who assumes it converts will set one and expect
-   * the other to follow, so the field has to say which it is.
-   */
-  it('tells a manual-pricing admin the dollar value does not drive the NGN price', () => {
-    const help = usdPriceHelp('MANUAL_NGN', 1387.82);
-    assert.match(help, /does not change/i);
-    assert.doesNotMatch(help, /sets the NGN price/i);
-  });
-
-  it('tells a GLOBAL_FX admin it does drive the price, and at what rate', () => {
-    const help = usdPriceHelp('GLOBAL_FX', 1387.82);
-    assert.match(help, /sets the NGN price/i);
-    assert.match(help, /1,387\.82/);
-  });
-
-  it('says the rate is missing rather than showing a blank one', () => {
-    assert.match(usdPriceHelp('GLOBAL_FX'), /no fx rate set/i);
   });
 });
 

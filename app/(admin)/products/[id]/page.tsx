@@ -313,7 +313,7 @@ export default function ProductDetailPage({
           isToggling={toggleAvailability.isPending}
         />
         <PricingCard
-          key={`${product.id}-${product.pricingMode}-${product.priceUsd ?? ''}-${product.snapshotNgnPrice}`}
+          key={`${product.id}-${product.markupBps ?? 'global'}-${product.priceUsd ?? ''}-${product.snapshotNgnPrice}`}
           product={product}
         />
         <VoucherStatsCard product={product} />

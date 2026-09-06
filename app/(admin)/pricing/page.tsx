@@ -98,7 +98,7 @@ function NoRateCard() {
       <CardHeader>
         <CardTitle className="text-base">No rate set</CardTitle>
         <CardDescription>
-          GLOBAL_FX products cannot be priced until a rate is set.
+          No product can be priced until a rate is set.
         </CardDescription>
       </CardHeader>
     </Card>
@@ -326,7 +326,9 @@ export default function PricingPage() {
               </span>
             </p>
             <p className="text-sm text-muted-foreground mt-2">
-              This is the rate applied to all GLOBAL_FX products.
+              This is the selling rate. Products follow the markup above
+              unless they set their own — those ignore it and do not move when
+              it changes.
             </p>
           </CardContent>
         </Card>

@@ -1,4 +1,3 @@
-import type { PricingMode } from '@/lib/types';
 
 /**
  * WhatsApp's catalog list rows truncate past this, and the backend enforces the
@@ -46,22 +45,4 @@ export function catalogNameIssue(name: string): string | null {
     return `Name must be at most ${CATALOG_NAME_MAX_LENGTH} characters — it has to fit a WhatsApp catalog row`;
   }
   return null;
-}
-
-/**
- * DISC-008: every product carries a dollar value, in both pricing modes, because
- * that is what a USD discount code is measured against.
- *
- * For GLOBAL_FX it drives the naira price. For MANUAL_NGN it does **not** — the
- * naira price stays exactly what the admin set, and the dollar figure is a
- * declared value used only for discount arithmetic. The two can drift apart, so
- * the form has to say which one it is.
- */
-export function usdPriceHelp(mode: PricingMode, rateNgnPerUsd?: number): string {
-  if (mode === 'MANUAL_NGN') {
-    return 'Used to value discount codes. It does not change the NGN price above — keep it in step with that price yourself.';
-  }
-  return rateNgnPerUsd
-    ? `Sets the NGN price. Current rate: ₦${rateNgnPerUsd.toLocaleString('en-NG')} / $1`
-    : 'No FX rate set — configure one on the Pricing page first.';
 }

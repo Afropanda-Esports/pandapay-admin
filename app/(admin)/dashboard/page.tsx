@@ -326,8 +326,8 @@ export default function DashboardPage() {
         />
       </div>
       <p className="mt-2 text-xs text-muted-foreground">
-        FX markup is the FX spread on fulfilled GLOBAL_FX orders — not wholesale
-        profit or Paystack fees.
+        FX markup is the spread on fulfilled orders with a face value — not
+        wholesale profit or Paystack fees.
       </p>
 
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">

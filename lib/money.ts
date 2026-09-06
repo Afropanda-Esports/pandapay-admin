@@ -1,4 +1,3 @@
-import type { PricingMode } from '@/lib/types';
 
 /**
  * Currencies the system can price in — mirrors backend `SupportedCurrency`
@@ -22,17 +21,6 @@ const SYMBOLS: Record<SupportedCurrency, string> = {
   NGN: '₦',
   USD: '$',
 };
-
-/**
- * D1(a): base currency is derived from pricing mode so the two cannot diverge
- * in the admin console. MANUAL_NGN → NGN, GLOBAL_FX → USD.
- */
-export function baseCurrencyFor(mode: PricingMode): SupportedCurrency {
-  if (mode === 'MANUAL_NGN') return 'NGN';
-  if (mode === 'GLOBAL_FX') return 'USD';
-  const _exhaustive: never = mode;
-  return _exhaustive;
-}
 
 /**
  * Split an amount into fixed-2 decimal parts without floating-point money math.

@@ -16,7 +16,9 @@ function formatNgnDecimal(raw: string, fractionDigits: number): string {
 
 /**
  * Realized FX markup for display.
- * `null` / missing → "—". `"0.00"` is a real zero (MANUAL_NGN or wiped spread).
+ * `null` / missing → "—". `"0.00"` is a real zero — since PRICE-004 that means
+ * a product with no face value, so no currency was crossed and there is no FX
+ * margin to report.
  */
 export function formatFxMarkupNgn(
   value: string | null | undefined,
@@ -33,6 +35,13 @@ export function formatMarkupBps(
   return `${bps} bps (${pct}%)`;
 }
 
+/**
+ * PRICE-004 retired pricing modes, but `orders.pricing_mode` survives as a
+ * legacy column: orders are financial records and are not rewritten. Orders
+ * placed before the change still show how they were priced; ones placed since
+ * carry null and render as "—". Deleting this would erase that history from
+ * the console.
+ */
 export function formatPricingMode(
   mode: string | null | undefined,
 ): string {

@@ -1,6 +1,5 @@
 import { apiFetch } from './client';
 import type {
-  PricingMode,
   Product,
   ProductWithStats,
   VoucherStats,
@@ -114,17 +113,23 @@ export const getProducts = (categoryId?: string) =>
 export const getProduct = (id: string) =>
   apiFetch<ProductWithStats>(`/admin/products/${id}`);
 
+/**
+ * Unused since CAT-011-FE removed catalog creation from the console. Kept
+ * against the real API shape rather than deleted: a dead client with a stale
+ * signature is the kind of lie that gets copied when creation returns.
+ *
+ * PRICE-004: currency is not sent — it comes from the brand's region.
+ */
 export const createProduct = (body: {
   brandId: string;
   lineId: string;
   name: string;
   categoryId: string;
-  /** CUR-001: required closed-set field; replaces free-text `currency`. */
-  baseCurrency: 'NGN' | 'USD';
-  pricingMode: PricingMode;
-  priceUsd?: number;
-  /** Transient create/update input only — not stored on the product row (PRICE-002). */
-  manualPriceNgn?: number;
+  priceUsd: number;
+  /** Margin over cost in basis points; omit to follow the global markup. */
+  markupBps?: number;
+  /** Only for a product in a naira-denominated region. */
+  ngnPrice?: number;
 }) =>
   apiFetch<Product>('/admin/products', {
     method: 'POST',
@@ -140,12 +145,19 @@ export const updateProduct = (
     body: JSON.stringify(body),
   });
 
+/**
+ * PRICE-004: a price is set as a face value plus a margin.
+ *
+ * `markupBps` is nullable on purpose — omitting it leaves the product's markup
+ * alone, sending `null` clears it back to the global markup, and sending `0`
+ * sets a zero margin. Those are three different requests.
+ */
 export const updateProductPricing = (
   id: string,
   body: {
-    pricingMode?: PricingMode;
     priceUsd?: number;
-    manualPriceNgn?: number;
+    markupBps?: number | null;
+    ngnPrice?: number;
   },
 ) =>
   apiFetch<Product>(`/admin/products/${id}/pricing`, {
