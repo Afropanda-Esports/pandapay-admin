@@ -383,11 +383,9 @@ export type DiscountCodeStatus = 'ACTIVE' | 'USED' | 'EXPIRED' | 'REVOKED';
 export interface DiscountCode {
   id: string;
   code: string;
-  productId: string | null; // exactly one of productId/category is set
-  categoryId: string | null;
-  category?: Category | null;
-  discountType: DiscountType;
-  discountValue: string; // DECIMAL — string
+  // DISC-008: a code is a dollar amount and carries no product or category
+  // scope (WA-052) — it applies to whatever is in the customer's cart.
+  valueUsd: string; // DECIMAL — string
   recipientLabel: string | null;
   expiresAt: string;
   isUsed: boolean;
@@ -402,10 +400,12 @@ export interface DiscountCode {
 
 export interface GenerateDiscountCodesInput {
   count: number; // 1–500
-  productId?: string;
-  categoryId?: string;
-  discountType: DiscountType;
-  discountValue: number;
+  /**
+   * DISC-008: the code's value in US dollars. Percentages were removed, and a
+   * naira value silently changed what a code bought each time the FX rate
+   * moved. Codes carry no product or category scope (WA-052).
+   */
+  valueUsd: number;
   expiresInDays?: number; // 1–90
   recipientLabel?: string;
 }

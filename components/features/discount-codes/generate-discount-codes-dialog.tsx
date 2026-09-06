@@ -1,10 +1,10 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Copy, Plus } from 'lucide-react';
-import { useMemo, useState } from 'react';
-import { Controller, useForm } from 'react-hook-form';
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
@@ -20,55 +20,19 @@ import {
 } from '@/components/ui/dialog';
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { ApiError } from '@/lib/api/client';
 import { generateDiscountCodes } from '@/lib/api/discount-codes';
-import { getProducts } from '@/lib/api/products';
-import { getCategories } from '@/lib/api/categories';
-import { toSelectItems } from '@/lib/select-items';
 import type { DiscountCode } from '@/lib/types';
 
-const DISCOUNT_TYPE_OPTIONS = [
-  { value: 'PERCENTAGE', label: 'Percentage off' },
-  { value: 'FIXED_AMOUNT', label: 'Fixed amount off' },
-] as const;
-
-const targetTypeValues = ['product', 'category'] as const;
-const discountTypeValues = ['PERCENTAGE', 'FIXED_AMOUNT'] as const;
-
-const schema = z
-  .object({
-    targetType: z.enum(targetTypeValues),
-    productId: z.string().optional(),
-    categoryId: z.string().optional(),
-    count: z.coerce.number().int().min(1).max(500),
-    discountType: z.enum(discountTypeValues),
-    discountValue: z.coerce.number().min(0.01),
-    expiresInDays: z.coerce.number().int().min(1).max(90).optional(),
-    recipientLabel: z.string().trim().max(120).optional(),
-  })
-  .superRefine((data, ctx) => {
-    if (data.targetType === 'product' && !data.productId) {
-      ctx.addIssue({
-        code: 'custom',
-        message: 'Select a product',
-        path: ['productId'],
-      });
-    }
-    if (data.targetType === 'category' && !data.categoryId) {
-      ctx.addIssue({
-        code: 'custom',
-        message: 'Select a category',
-        path: ['categoryId'],
-      });
-    }
-  });
+const schema = z.object({
+  count: z.coerce.number().int().min(1).max(500),
+  // DISC-008: codes are a dollar amount. Percentages were removed — there is no
+  // honest dollar equivalent for "10% of whatever you buy" — and a naira value
+  // silently changed what a code bought every time the FX rate moved.
+  valueUsd: z.coerce.number().min(0.01),
+  expiresInDays: z.coerce.number().int().min(1).max(90).optional(),
+  recipientLabel: z.string().trim().max(120).optional(),
+});
 
 type FormValues = z.input<typeof schema>;
 
@@ -77,51 +41,22 @@ export function GenerateDiscountCodesDialog() {
   const [generated, setGenerated] = useState<DiscountCode[] | null>(null);
   const queryClient = useQueryClient();
 
-  const { data: products } = useQuery({
-    queryKey: ['products'],
-    queryFn: () => getProducts(),
-    staleTime: 60_000,
-  });
-
-  const { data: categories } = useQuery({
-    queryKey: ['categories'],
-    queryFn: getCategories,
-    staleTime: 60_000,
-  });
-
-  const productSelectItems = useMemo(
-    () => toSelectItems(products),
-    [products],
-  );
-  const categorySelectItems = useMemo(
-    () => toSelectItems(categories),
-    [categories],
-  );
-
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      targetType: 'category',
-      productId: undefined,
-      categoryId: undefined,
       count: 10,
-      discountType: 'PERCENTAGE',
-      discountValue: '' as unknown as number,
+      valueUsd: '' as unknown as number,
       expiresInDays: 30,
       recipientLabel: '',
     },
   });
 
-  const targetType = form.watch('targetType');
 
   const mutation = useMutation({
     mutationFn: (data: z.output<typeof schema>) =>
       generateDiscountCodes({
         count: data.count,
-        productId: data.targetType === 'product' ? data.productId : undefined,
-        categoryId: data.targetType === 'category' ? data.categoryId : undefined,
-        discountType: data.discountType,
-        discountValue: data.discountValue,
+        valueUsd: data.valueUsd,
         expiresInDays: data.expiresInDays,
         recipientLabel: data.recipientLabel || undefined,
       }),
@@ -173,93 +108,13 @@ export function GenerateDiscountCodesDialog() {
             <DialogHeader>
               <DialogTitle>Generate discount codes</DialogTitle>
               <DialogDescription>
-                Bulk-create single-use codes tied to one product or an entire
-                category.
+                Bulk-create single-use codes worth a fixed amount in US
+                dollars. A code applies to whatever is in the customer&apos;s
+                cart — it is not tied to a particular product.
               </DialogDescription>
             </DialogHeader>
 
             <FieldGroup>
-              <Field>
-                <FieldLabel htmlFor="discount-target-type">Applies to</FieldLabel>
-                <Controller
-                  control={form.control}
-                  name="targetType"
-                  render={({ field }) => (
-                    <Select
-                      value={field.value}
-                      onValueChange={(v) => field.onChange(v)}
-                      disabled={mutation.isPending}
-                    >
-                      <SelectTrigger id="discount-target-type" className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="category">A category</SelectItem>
-                        <SelectItem value="product">A specific product</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-              </Field>
-
-              {targetType === 'product' ? (
-                <Field>
-                  <FieldLabel htmlFor="discount-product">Product</FieldLabel>
-                  <Controller
-                    control={form.control}
-                    name="productId"
-                    render={({ field }) => (
-                      <Select
-                        items={productSelectItems}
-                        value={field.value ?? ''}
-                        onValueChange={(v) => field.onChange(v)}
-                        disabled={mutation.isPending}
-                      >
-                        <SelectTrigger id="discount-product" className="w-full">
-                          <SelectValue placeholder="Select a product" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {(products ?? []).map((p) => (
-                            <SelectItem key={p.id} value={p.id}>
-                              {p.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                  <FieldError>{form.formState.errors.productId?.message}</FieldError>
-                </Field>
-              ) : (
-                <Field>
-                  <FieldLabel htmlFor="discount-category">Category</FieldLabel>
-                  <Controller
-                    control={form.control}
-                    name="categoryId"
-                    render={({ field }) => (
-                      <Select
-                        items={categorySelectItems}
-                        value={field.value ?? ''}
-                        onValueChange={(v) => field.onChange(v)}
-                        disabled={mutation.isPending}
-                      >
-                        <SelectTrigger id="discount-category" className="w-full">
-                          <SelectValue placeholder="Select a category" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {(categories ?? []).map((opt) => (
-                            <SelectItem key={opt.id} value={opt.id}>
-                              {opt.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                  <FieldError>{form.formState.errors.categoryId?.message}</FieldError>
-                </Field>
-              )}
-
               <Field>
                 <FieldLabel htmlFor="discount-count">How many codes</FieldLabel>
                 <Input
@@ -275,49 +130,22 @@ export function GenerateDiscountCodesDialog() {
               </Field>
 
               <Field>
-                <FieldLabel htmlFor="discount-type">Discount type</FieldLabel>
-                <Controller
-                  control={form.control}
-                  name="discountType"
-                  render={({ field }) => (
-                    <Select
-                      items={DISCOUNT_TYPE_OPTIONS}
-                      value={field.value}
-                      onValueChange={(v) => field.onChange(v)}
-                      disabled={mutation.isPending}
-                    >
-                      <SelectTrigger id="discount-type" className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {DISCOUNT_TYPE_OPTIONS.map((opt) => (
-                          <SelectItem key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-              </Field>
-
-              <Field>
-                <FieldLabel htmlFor="discount-value">
-                  {form.watch('discountType') === 'FIXED_AMOUNT'
-                    ? 'Amount off (NGN)'
-                    : 'Percent off'}
-                </FieldLabel>
+                <FieldLabel htmlFor="discount-value">Value (USD)</FieldLabel>
                 <Input
                   id="discount-value"
                   type="number"
                   inputMode="decimal"
                   min={0.01}
                   step="0.01"
-                  placeholder={form.watch('discountType') === 'FIXED_AMOUNT' ? '500' : '10'}
+                  placeholder="7.00"
                   disabled={mutation.isPending}
-                  {...form.register('discountValue')}
+                  {...form.register('valueUsd')}
                 />
-                <FieldError>{form.formState.errors.discountValue?.message}</FieldError>
+                <p className="text-xs text-muted-foreground">
+                  Priced in dollars so a code keeps its value when the naira
+                  moves. A code covering the whole cart checks out at no cost.
+                </p>
+                <FieldError>{form.formState.errors.valueUsd?.message}</FieldError>
               </Field>
 
               <Field>
