@@ -16,8 +16,6 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { usePermissions } from '@/hooks/use-permissions';
 import { listDiscountCodes, revokeDiscountCode } from '@/lib/api/discount-codes';
-import { getProducts } from '@/lib/api/products';
-import { getCategories } from '@/lib/api/categories';
 import { ApiError } from '@/lib/api/client';
 import type { DiscountCode, DiscountCodeStatus } from '@/lib/types';
 
@@ -31,17 +29,15 @@ const STATUS_TABS: { value: DiscountCodeStatus | 'ALL'; label: string }[] = [
   { value: 'ALL', label: 'All' },
 ];
 
-const DISCOUNT_TYPE_LABEL: Record<DiscountCode['discountType'], string> = {
-  PERCENTAGE: '% off',
-  FIXED_AMOUNT: 'off',
-};
-
+/**
+ * DISC-008: codes are denominated in US dollars, so the value is shown in the
+ * unit it is actually stored in. Converting it to naira for display would
+ * reintroduce exactly the drift the dollar denomination removes — the figure
+ * would change between page loads as the rate moved.
+ */
 function formatDiscountValue(code: DiscountCode) {
-  const n = Number.parseFloat(code.discountValue);
-  const value = Number.isFinite(n) ? n.toLocaleString('en-NG') : code.discountValue;
-  return code.discountType === 'PERCENTAGE'
-    ? `${value}% off`
-    : `₦${value} ${DISCOUNT_TYPE_LABEL.FIXED_AMOUNT}`;
+  const n = Number.parseFloat(code.valueUsd);
+  return Number.isFinite(n) ? `$${n.toFixed(2)}` : `$${code.valueUsd}`;
 }
 
 export default function DiscountCodesPage() {
@@ -56,20 +52,6 @@ export default function DiscountCodesPage() {
     queryFn: () =>
       listDiscountCodes(page, PAGE_SIZE, statusFilter === 'ALL' ? undefined : statusFilter),
   });
-
-  const { data: products } = useQuery({
-    queryKey: ['products'],
-    queryFn: () => getProducts(),
-    staleTime: 60_000,
-  });
-  const productNameById = new Map((products ?? []).map((p) => [p.id, p.name]));
-
-  const { data: categories = [] } = useQuery({
-    queryKey: ['categories'],
-    queryFn: getCategories,
-    staleTime: 60_000,
-  });
-  const categoryNameById = new Map((categories ?? []).map((c) => [c.id, c.name]));
 
   const revoke = useMutation({
     mutationFn: revokeDiscountCode,
@@ -131,7 +113,6 @@ export default function DiscountCodesPage() {
               <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
                 <tr>
                   <th className="px-3 py-2 font-medium">Code</th>
-                  <th className="px-3 py-2 font-medium">Applies to</th>
                   <th className="px-3 py-2 font-medium">Discount</th>
                   <th className="px-3 py-2 font-medium">Status</th>
                   <th className="px-3 py-2 font-medium">Expires</th>
@@ -143,12 +124,6 @@ export default function DiscountCodesPage() {
                 {codes.map((code) => (
                   <tr key={code.id} className="border-t border-border/60 align-middle">
                     <td className="px-3 py-2 font-mono text-xs">{code.code}</td>
-                    <td className="px-3 py-2 text-xs text-muted-foreground">
-                      {code.categoryId
-                        ? categoryNameById.get(code.categoryId) || 'Unknown Category'
-                        : (code.productId && productNameById.get(code.productId)) ||
-                          `${code.productId?.slice(0, 8)}…`}
-                    </td>
                     <td className="px-3 py-2">{formatDiscountValue(code)}</td>
                     <td className="px-3 py-2">
                       <DiscountStatusBadge code={code} />
