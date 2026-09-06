@@ -31,6 +31,20 @@ export const getProductBrands = (regionId?: string, categoryId?: string) => {
   return apiFetch<ProductBrand[]>(`/admin/product-brands${q ? `?${q}` : ''}`);
 };
 
+/**
+ * CAT-007 constrains the brand name to LAUNCH_BRANDS server-side. The list is
+ * fetched rather than hardcoded so it cannot drift from the constant the
+ * WhatsApp bot matches customer messages against.
+ */
+export const getAllowedBrandNames = () =>
+  apiFetch<string[]>('/admin/product-brands/allowed-names');
+
+export const createProductBrand = (body: { regionId: string; name: string }) =>
+  apiFetch<ProductBrand>('/admin/product-brands', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+
 export const getProductLines = (brandId?: string) => {
   const q = brandId ? `?brandId=${brandId}` : '';
   return apiFetch<ProductLine[]>(`/admin/product-lines${q}`);

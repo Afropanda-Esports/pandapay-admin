@@ -36,6 +36,7 @@ import {
   createProduct,
 } from '@/lib/api/products';
 import { getCategories } from '@/lib/api/categories';
+import { usdPriceHelp } from '@/lib/catalog-forms';
 import { toSelectItems } from '@/lib/select-items';
 import type { PricingMode } from '@/lib/types';
 
@@ -57,6 +58,16 @@ const schema = z
       .default('NGN'),
   })
   .superRefine((data, ctx) => {
+    // DISC-008: every product carries a dollar value, in both pricing modes —
+    // it is what a USD discount code is measured against. For MANUAL_NGN it is
+    // declared only and does not affect the naira price set below.
+    if (!data.priceUsd || data.priceUsd <= 0) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Must be greater than 0',
+        path: ['priceUsd'],
+      });
+    }
     if (data.pricingMode === 'MANUAL_NGN') {
       if (!data.manualPriceNgn || data.manualPriceNgn <= 0) {
         ctx.addIssue({
@@ -65,12 +76,6 @@ const schema = z
           path: ['manualPriceNgn'],
         });
       }
-    } else if (!data.priceUsd || data.priceUsd <= 0) {
-      ctx.addIssue({
-        code: 'custom',
-        message: 'Must be greater than 0',
-        path: ['priceUsd'],
-      });
     }
   });
 
@@ -168,6 +173,7 @@ export function CreateProductDialog() {
         currency: data.currency,
         pricingMode: 'MANUAL_NGN',
         manualPriceNgn: data.manualPriceNgn,
+        priceUsd: data.priceUsd,
       });
     },
     onSuccess: () => {
@@ -408,31 +414,37 @@ export function CreateProductDialog() {
                   disabled={mutation.isPending}
                   {...form.register('manualPriceNgn')}
                 />
+                <p className="text-xs text-muted-foreground">
+                  What the customer pays. Set by you and not affected by the FX
+                  rate.
+                </p>
                 <FieldError>
                   {form.formState.errors.manualPriceNgn?.message}
                 </FieldError>
               </Field>
-            ) : (
-              <Field>
-                <FieldLabel htmlFor="product-usd">USD face value</FieldLabel>
-                <Input
-                  id="product-usd"
-                  type="number"
-                  inputMode="decimal"
-                  min={0.01}
-                  step="0.01"
-                  placeholder="10.00"
-                  disabled={mutation.isPending}
-                  {...form.register('priceUsd')}
-                />
-                <p className="text-xs text-muted-foreground">
-                  {rate
-                    ? `Current rate: ₦${rate.ngnPerUsd.toLocaleString('en-NG')} / $1`
-                    : 'No FX rate set — configure one on the Pricing page first.'}
-                </p>
-                <FieldError>{form.formState.errors.priceUsd?.message}</FieldError>
-              </Field>
-            )}
+            ) : null}
+
+            {/* DISC-008: required in both pricing modes, because a USD discount
+                code is measured against it. Its meaning differs by mode, so the
+                description does too — for manual pricing it is a declared value
+                that does not drive the naira price above. */}
+            <Field>
+              <FieldLabel htmlFor="product-usd">USD value</FieldLabel>
+              <Input
+                id="product-usd"
+                type="number"
+                inputMode="decimal"
+                min={0.01}
+                step="0.01"
+                placeholder="10.00"
+                disabled={mutation.isPending}
+                {...form.register('priceUsd')}
+              />
+              <p className="text-xs text-muted-foreground">
+                {usdPriceHelp(pricingMode, rate?.ngnPerUsd)}
+              </p>
+              <FieldError>{form.formState.errors.priceUsd?.message}</FieldError>
+            </Field>
 
             <Field>
               <FieldLabel htmlFor="product-currency">Currency</FieldLabel>
