@@ -154,7 +154,9 @@ export interface OrderProductRef {
   categoryId: string;
   category?: Category;
   snapshotNgnPrice: string;
-  currency: string;
+  /** CUR-001: renamed from `currency`. */
+  baseCurrency: 'NGN' | 'USD';
+  priceUsd?: string | null;
   isAvailable: boolean;
 }
 
@@ -289,11 +291,11 @@ export interface Product {
   name: string;
   categoryId: string;
   category?: Category;
-  currency: string;
+  /** CUR-001: closed set; renamed from free-text `currency`. */
+  baseCurrency: 'NGN' | 'USD';
   isAvailable: boolean;
   pricingMode: PricingMode;
   priceUsd: string | null;
-  manualPriceNgn: string | null;
   snapshotNgnPrice: string;
   snapshotAt: string;
   /**
@@ -375,23 +377,22 @@ export interface LoginResponse {
   display_name?: string;
 }
 
-// ─── Discount codes ───────────────────────────────────────────────────────────
-
-export type DiscountType = 'PERCENTAGE' | 'FIXED_AMOUNT';
+// ─── Voucher codes (VOUCH-001) ────────────────────────────────────────────────
 
 /**
  * Not returned by the API — the backend has no `status` column, only
  * `isUsed`/`isRevoked`/`expiresAt`. Derive this client-side (see
- * discount-status-badge.tsx) mirroring the backend's own filter precedence.
+ * voucher-status-badge.tsx) mirroring the backend's own filter precedence.
  */
-export type DiscountCodeStatus = 'ACTIVE' | 'USED' | 'EXPIRED' | 'REVOKED';
+export type VoucherCodeStatus = 'ACTIVE' | 'USED' | 'EXPIRED' | 'REVOKED';
 
-export interface DiscountCode {
+export interface VoucherCode {
   id: string;
   code: string;
-  // DISC-008: a code is a dollar amount and carries no product or category
-  // scope (WA-052) — it applies to whatever is in the customer's cart.
-  valueUsd: string; // DECIMAL — string
+  /** Face value in `currency` — DECIMAL string, never a float. */
+  value: string;
+  /** Currency the voucher is denominated in (NGN | USD). */
+  currency: 'NGN' | 'USD';
   recipientLabel: string | null;
   expiresAt: string;
   isUsed: boolean;
@@ -404,14 +405,11 @@ export interface DiscountCode {
   updatedAt: string;
 }
 
-export interface GenerateDiscountCodesInput {
+export interface GenerateVoucherCodesInput {
   count: number; // 1–500
-  /**
-   * DISC-008: the code's value in US dollars. Percentages were removed, and a
-   * naira value silently changed what a code bought each time the FX rate
-   * moved. Codes carry no product or category scope (WA-052).
-   */
-  valueUsd: number;
+  /** Face value in `currency`. */
+  value: number;
+  currency: 'NGN' | 'USD';
   expiresInDays?: number; // 1–90
   recipientLabel?: string;
 }

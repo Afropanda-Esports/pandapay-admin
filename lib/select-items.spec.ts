@@ -96,37 +96,34 @@ test('all UUID selects in the product dialog provide label maps', () => {
 });
 
 /**
- * DISC-008 removed the product and category selects from the discount dialog:
- * codes are product-agnostic (WA-052) and denominated in dollars, so there is
- * nothing UUID-valued left to label. The assertion that replaced it is the one
- * that still matters — the dialog must not quietly regrow a scope the backend
- * ignores, which would promise the operator something the system cannot honour.
+ * VOUCH-001: vouchers are product-agnostic (WA-052). The dialog must not quietly
+ * regrow a product/category scope the backend ignores.
  */
-test('the discount dialog offers no product or category scope', () => {
+test('the voucher dialog offers no product or category scope', () => {
   const source = readFileSync(
-    'components/features/discount-codes/generate-discount-codes-dialog.tsx',
+    'components/features/voucher-codes/generate-voucher-codes-dialog.tsx',
     'utf8',
   );
 
-  assert.ok(!source.includes('productId'), 'discount codes carry no product scope');
-  assert.ok(!source.includes('categoryId'), 'discount codes carry no category scope');
+  assert.ok(!source.includes('productId'), 'voucher codes carry no product scope');
+  assert.ok(!source.includes('categoryId'), 'voucher codes carry no category scope');
 });
 
 /**
- * The payload, not merely the file's vocabulary. The dialog kept sending
- * `discountType` and `discountValue` after the API moved to `valueUsd`, so
- * every Generate press failed with a 400 — and nothing caught it, because the
- * words still appeared in the source. This asserts what actually goes over the
- * wire.
+ * The payload, not merely the file's vocabulary. Asserts what goes over the
+ * wire after VOUCH-001: `value` + `currency`, not the retired `valueUsd` /
+ * `discountType` / `discountValue` fields.
  */
-test('the discount dialog submits a dollar amount, not the removed naira fields', () => {
+test('the voucher dialog submits value and currency', () => {
   const [payload, ...rest] = callPayloads(
-    'components/features/discount-codes/generate-discount-codes-dialog.tsx',
-    'generateDiscountCodes',
+    'components/features/voucher-codes/generate-voucher-codes-dialog.tsx',
+    'generateVoucherCodes',
   );
 
   assert.equal(rest.length, 0, 'expected exactly one generate call');
-  assert.equal(payload.valueUsd, 'data.valueUsd');
+  assert.equal(payload.value, 'data.value');
+  assert.equal(payload.currency, 'data.currency');
+  assert.ok(!('valueUsd' in payload), 'valueUsd was removed by VOUCH-001');
   assert.ok(!('discountValue' in payload), 'discountValue was removed by DISC-008');
   assert.ok(!('discountType' in payload), 'discountType was removed by DISC-008');
 });

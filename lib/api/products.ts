@@ -119,9 +119,11 @@ export const createProduct = (body: {
   lineId: string;
   name: string;
   categoryId: string;
-  currency?: string;
+  /** CUR-001: required closed-set field; replaces free-text `currency`. */
+  baseCurrency: 'NGN' | 'USD';
   pricingMode: PricingMode;
   priceUsd?: number;
+  /** Transient create/update input only — not stored on the product row (PRICE-002). */
   manualPriceNgn?: number;
 }) =>
   apiFetch<Product>('/admin/products', {

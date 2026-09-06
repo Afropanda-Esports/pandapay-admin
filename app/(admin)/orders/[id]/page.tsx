@@ -40,6 +40,7 @@ import {
   formatPricingMode,
   formatRateSnapshot,
 } from '@/lib/fx-markup-display';
+import { formatMoney } from '@/lib/money';
 import { formatOrderSource } from '@/lib/order-source';
 import type { OrderDetail, PaymentMode } from '@/lib/types';
 
@@ -305,9 +306,11 @@ function VoucherInfo({ order }: Readonly<{ order: OrderDetail }>) {
       {order.product?.snapshotNgnPrice && (
         <DetailRow
           label="Price"
-          value={`${formatAmount(order.product.snapshotNgnPrice)} ${
-            order.product.currency
-          }`}
+          value={
+            order.product.baseCurrency === 'USD' && order.product.priceUsd
+              ? formatMoney(order.product.priceUsd, 'USD')
+              : formatMoney(order.product.snapshotNgnPrice, 'NGN')
+          }
         />
       )}
       <DetailRow

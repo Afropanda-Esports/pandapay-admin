@@ -29,16 +29,9 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { ApiError } from '@/lib/api/client';
 import { getProduct, updateProduct } from '@/lib/api/products';
+import { formatProductPrice } from '@/lib/money';
 import type { ProductWithStats } from '@/lib/types';
 import { cn } from '@/lib/utils';
-
-const formatPrice = (price: string, currency: string) => {
-  const n = Number.parseFloat(price);
-  const formatted = Number.isFinite(n)
-    ? n.toLocaleString('en-NG', { maximumFractionDigits: 2 })
-    : price;
-  return currency === 'NGN' ? `₦${formatted}` : `${formatted} ${currency}`;
-};
 
 function productStatusBadge(isAvailable: boolean, stockAvailable: number) {
   if (isAvailable && stockAvailable > 0) {
@@ -105,7 +98,7 @@ function DetailsCard({
             label="Category"
             value={product.category?.name || 'Unknown'}
           />
-          <DetailRow label="Currency" value={product.currency} />
+          <DetailRow label="Currency" value={product.baseCurrency} />
           <DetailRow
             label="Status"
             value={productStatusBadge(product.isAvailable, product.voucherStats.available)}
@@ -287,9 +280,8 @@ export default function ProductDetailPage({
     <div>
       <PageHeader
         title={product.name}
-        description={`${product.category?.name || 'Unknown'} · ${formatPrice(
-          product.snapshotNgnPrice,
-          product.currency,
+        description={`${product.category?.name || 'Unknown'} · ${formatProductPrice(
+          product,
         )}`}
         actions={
           <div className="flex items-center gap-2">
@@ -321,7 +313,7 @@ export default function ProductDetailPage({
           isToggling={toggleAvailability.isPending}
         />
         <PricingCard
-          key={`${product.id}-${product.pricingMode}-${product.priceUsd ?? ''}-${product.manualPriceNgn ?? ''}`}
+          key={`${product.id}-${product.pricingMode}-${product.priceUsd ?? ''}-${product.snapshotNgnPrice}`}
           product={product}
         />
         <VoucherStatsCard product={product} />

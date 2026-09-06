@@ -18,8 +18,8 @@ export type AdminPermission =
   | 'admins:manage'
   | 'feature-flags:view'
   | 'feature-flags:manage'
-  | 'discount-codes:view'
-  | 'discount-codes:manage';
+  | 'voucher-codes:view'
+  | 'voucher-codes:manage';
 
 const MANAGER_PERMISSIONS: AdminPermission[] = [
   'dashboard:view',
@@ -34,7 +34,7 @@ const MANAGER_PERMISSIONS: AdminPermission[] = [
   'fraud:manage',
   'audit:view',
   'feature-flags:view',
-  'discount-codes:view',
+  'voucher-codes:view',
 ];
 
 const SUPER_ADMIN_PERMISSIONS: AdminPermission[] = [
@@ -43,7 +43,7 @@ const SUPER_ADMIN_PERMISSIONS: AdminPermission[] = [
   'pricing:manage',
   'admins:manage',
   'feature-flags:manage',
-  'discount-codes:manage',
+  'voucher-codes:manage',
 ];
 
 const ROLE_PERMISSIONS: Record<AdminRole, ReadonlySet<AdminPermission>> = {

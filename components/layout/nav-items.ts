@@ -59,10 +59,10 @@ export const NAV_ITEMS: NavItem[] = [
   },
   { label: 'Feature Flags', href: '/feature-flags', icon: Flag, permission: 'feature-flags:view' },
   {
-    label: 'Discount Codes',
-    href: '/discount-codes',
+    label: 'Voucher Codes',
+    href: '/voucher-codes',
     icon: Tag,
-    permission: 'discount-codes:view',
+    permission: 'voucher-codes:view',
   },
   { label: 'Audit Log', href: '/audit', icon: FileText, permission: 'audit:view' },
   {

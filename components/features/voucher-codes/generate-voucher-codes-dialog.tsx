@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Copy, Plus } from 'lucide-react';
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
@@ -20,49 +20,62 @@ import {
 } from '@/components/ui/dialog';
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { ApiError } from '@/lib/api/client';
-import { generateDiscountCodes } from '@/lib/api/discount-codes';
-import type { DiscountCode } from '@/lib/types';
+import { generateVoucherCodes } from '@/lib/api/voucher-codes';
+import { SUPPORTED_CURRENCIES } from '@/lib/money';
+import type { VoucherCode } from '@/lib/types';
+
+const CURRENCY_OPTIONS = SUPPORTED_CURRENCIES.map((value) => ({
+  value,
+  label: value,
+}));
 
 const schema = z.object({
   count: z.coerce.number().int().min(1).max(500),
-  // DISC-008: codes are a dollar amount. Percentages were removed — there is no
-  // honest dollar equivalent for "10% of whatever you buy" — and a naira value
-  // silently changed what a code bought every time the FX rate moved.
-  valueUsd: z.coerce.number().min(0.01),
+  // VOUCH-001: face value in the selected currency — not USD-only.
+  value: z.coerce.number().min(0.01),
+  currency: z.enum(SUPPORTED_CURRENCIES),
   expiresInDays: z.coerce.number().int().min(1).max(90).optional(),
   recipientLabel: z.string().trim().max(120).optional(),
 });
 
 type FormValues = z.input<typeof schema>;
 
-export function GenerateDiscountCodesDialog() {
+export function GenerateVoucherCodesDialog() {
   const [open, setOpen] = useState(false);
-  const [generated, setGenerated] = useState<DiscountCode[] | null>(null);
+  const [generated, setGenerated] = useState<VoucherCode[] | null>(null);
   const queryClient = useQueryClient();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
       count: 10,
-      valueUsd: '' as unknown as number,
+      value: '' as unknown as number,
+      currency: 'USD',
       expiresInDays: 30,
       recipientLabel: '',
     },
   });
 
-
   const mutation = useMutation({
     mutationFn: (data: z.output<typeof schema>) =>
-      generateDiscountCodes({
+      generateVoucherCodes({
         count: data.count,
-        valueUsd: data.valueUsd,
+        value: data.value,
+        currency: data.currency,
         expiresInDays: data.expiresInDays,
         recipientLabel: data.recipientLabel || undefined,
       }),
     onSuccess: (codes) => {
-      toast.success(`${codes.length} discount code${codes.length === 1 ? '' : 's'} generated`);
-      queryClient.invalidateQueries({ queryKey: ['discount-codes'] });
+      toast.success(`${codes.length} voucher code${codes.length === 1 ? '' : 's'} generated`);
+      queryClient.invalidateQueries({ queryKey: ['voucher-codes'] });
       setGenerated(codes);
       form.reset();
     },
@@ -72,7 +85,7 @@ export function GenerateDiscountCodesDialog() {
           ? err.message
           : err instanceof Error
             ? err.message
-            : 'Failed to generate discount codes';
+            : 'Failed to generate voucher codes';
       toast.error(message);
     },
   });
@@ -106,19 +119,19 @@ export function GenerateDiscountCodesDialog() {
         ) : (
           <form onSubmit={onSubmit} noValidate>
             <DialogHeader>
-              <DialogTitle>Generate discount codes</DialogTitle>
+              <DialogTitle>Generate voucher codes</DialogTitle>
               <DialogDescription>
-                Bulk-create single-use codes worth a fixed amount in US
-                dollars. A code applies to whatever is in the customer&apos;s
-                cart — it is not tied to a particular product.
+                Bulk-create single-use vouchers worth a fixed amount in NGN or
+                USD. A voucher applies only to cart items priced in the same
+                currency — it is not tied to a particular product.
               </DialogDescription>
             </DialogHeader>
 
             <FieldGroup>
               <Field>
-                <FieldLabel htmlFor="discount-count">How many codes</FieldLabel>
+                <FieldLabel htmlFor="voucher-count">How many codes</FieldLabel>
                 <Input
-                  id="discount-count"
+                  id="voucher-count"
                   type="number"
                   inputMode="numeric"
                   min={1}
@@ -130,28 +143,60 @@ export function GenerateDiscountCodesDialog() {
               </Field>
 
               <Field>
-                <FieldLabel htmlFor="discount-value">Value (USD)</FieldLabel>
+                <FieldLabel htmlFor="voucher-currency">Currency</FieldLabel>
+                <Controller
+                  control={form.control}
+                  name="currency"
+                  render={({ field }) => (
+                    <Select
+                      items={CURRENCY_OPTIONS}
+                      value={field.value}
+                      onValueChange={(v) => field.onChange(v)}
+                      disabled={mutation.isPending}
+                    >
+                      <SelectTrigger id="voucher-currency" className="w-full">
+                        <SelectValue placeholder="Select currency" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CURRENCY_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                <p className="text-xs text-muted-foreground">
+                  The voucher only reduces the matching-currency subtotal.
+                </p>
+                <FieldError>{form.formState.errors.currency?.message}</FieldError>
+              </Field>
+
+              <Field>
+                <FieldLabel htmlFor="voucher-value">Value</FieldLabel>
                 <Input
-                  id="discount-value"
+                  id="voucher-value"
                   type="number"
                   inputMode="decimal"
                   min={0.01}
                   step="0.01"
                   placeholder="7.00"
                   disabled={mutation.isPending}
-                  {...form.register('valueUsd')}
+                  {...form.register('value')}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Priced in dollars so a code keeps its value when the naira
-                  moves. A code covering the whole cart checks out at no cost.
+                  Face value in the currency above. A voucher covering the whole
+                  matching subtotal can check out at no cost when that is the
+                  entire cart.
                 </p>
-                <FieldError>{form.formState.errors.valueUsd?.message}</FieldError>
+                <FieldError>{form.formState.errors.value?.message}</FieldError>
               </Field>
 
               <Field>
-                <FieldLabel htmlFor="discount-expires">Expires in (days)</FieldLabel>
+                <FieldLabel htmlFor="voucher-expires">Expires in (days)</FieldLabel>
                 <Input
-                  id="discount-expires"
+                  id="voucher-expires"
                   type="number"
                   inputMode="numeric"
                   min={1}
@@ -164,11 +209,11 @@ export function GenerateDiscountCodesDialog() {
               </Field>
 
               <Field>
-                <FieldLabel htmlFor="discount-recipient">
+                <FieldLabel htmlFor="voucher-recipient">
                   Recipient label (optional)
                 </FieldLabel>
                 <Input
-                  id="discount-recipient"
+                  id="voucher-recipient"
                   placeholder="e.g. influencer campaign, player ID"
                   maxLength={120}
                   disabled={mutation.isPending}
@@ -203,7 +248,7 @@ export function GenerateDiscountCodesDialog() {
 function GeneratedCodesPanel({
   codes,
   onClose,
-}: Readonly<{ codes: DiscountCode[]; onClose: () => void }>) {
+}: Readonly<{ codes: VoucherCode[]; onClose: () => void }>) {
   const handleCopyAll = async () => {
     try {
       await navigator.clipboard.writeText(codes.map((c) => c.code).join('\n'));
