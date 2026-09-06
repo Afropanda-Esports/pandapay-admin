@@ -1,8 +1,12 @@
 {
   "project": "pandapay-admin",
-  "updated": "2026-08-30",
+  "updated": "2026-09-06",
   "legend": {
-    "status": ["FAIL", "PENDING_REVIEW", "PASS"],
+    "status": [
+      "FAIL",
+      "PENDING_REVIEW",
+      "PASS"
+    ],
     "note": "FAIL = not done, broken, or rejected. PENDING_REVIEW = built and packet emitted, awaiting reviewer verdict. PASS = reviewed, approved, merged, and verified. The executor may set PENDING_REVIEW but NEVER PASS — PASS is set by the human/reviewer after approval.",
     "priority": "lower number = higher priority; agent picks the highest-priority FAIL",
     "id_convention": "ADMIN-FE-NNN — admin frontend features"
@@ -95,6 +99,14 @@
       "verify": "pnpm exec tsc --noEmit && node --experimental-strip-types --test lib/select-items.spec.ts",
       "status": "PENDING_REVIEW",
       "notes": "Companion to pandapay-be VOUCH-001. On feat/cur-001-fe-currency-selector with CUR-001-FE. Renamed discount→voucher; generate requires value+currency. VERIFY: tsc 0 after clearing stale .next/types; select-items 12/12."
+    },
+    {
+      "id": "PRICE-004-FE",
+      "name": "Set a product's markup instead of a pricing mode; currency comes from the region",
+      "priority": 1,
+      "verify": "pnpm test:unit && npx tsc --noEmit && pnpm lint && API_URL=http://localhost:3000 pnpm build",
+      "status": "PENDING_REVIEW",
+      "notes": "Contract: skills/.harness/contracts/PRICE-004-FE.md — EXECUTED 2026-09-06 on feat/price-004-fe-product-markup. Companion to be#163; MUST ship together — the console sends pricingMode/manualPriceNgn, which the new DTO rejects under forbidNonWhitelisted, so pricing is unsettable if the backend lands alone. New lib/markup.ts guards the null-vs-zero distinction (blank = inherit global, 0 = sell at cost); markup input is type=text on purpose because a number input coerces blank to 0. Rate-change preview corrected: it listed every GLOBAL_FX product at usd × rate; now only products that follow the global markup, priced with the ₦50 round-up the backend uses, plus a count of products that override and will not move. formatPricingMode KEPT for orders.pricing_mode (legacy column, financial records are not rewritten) — renders '—' for new orders. Removed: baseCurrencyFor (CUR-001-FE's D1(a) mapping, obsolete now currency comes from the region), usdPriceHelp and createProduct's currency field (both described the create form CAT-011-FE removed). Q1 taken as (a): currency read from product.baseCurrency, the backend's derived mirror. Verify: 58 unit tests, tsc 0, lint 0 errors (2 warnings pre-existing), build 0. Mutations caught: empty parsed as 0, zero not treated as an override, preview rounding down, effectiveMarkupBps using || instead of ??. NOT covered: no component tests exist in this repo — success criteria 1-6 are human checks. Executor did not self-PASS."
     }
   ]
 }

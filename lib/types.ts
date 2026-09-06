@@ -160,7 +160,13 @@ export interface OrderProductRef {
   isAvailable: boolean;
 }
 
-export type PricingMode = 'GLOBAL_FX' | 'MANUAL_NGN';
+/**
+ * PRICE-004 retired pricing modes. This type survives only to describe the
+ * value frozen on orders placed before that — `orders.pricing_mode` is kept as
+ * a legacy column because orders are financial records and are not rewritten.
+ * No product carries one, and nothing new is ever written with one.
+ */
+export type LegacyPricingMode = 'GLOBAL_FX' | 'MANUAL_NGN';
 
 export interface OrderUserRef {
   id: string;
@@ -183,8 +189,12 @@ export interface Order {
   createdAt: string;
   product?: OrderProductRef;
   user?: OrderUserRef;
-  /** Product pricing mode frozen at checkout. Null on pre-ORD-003 rows. */
-  pricingMode?: PricingMode | null;
+  /**
+   * The pricing mode frozen at checkout, on orders placed before PRICE-004.
+   * Null on pre-ORD-003 rows and on every order placed since — `markupBps` and
+   * `oracleNgnPerUsd` describe the pricing completely now.
+   */
+  pricingMode?: LegacyPricingMode | null;
   priceUsd?: string | null;
   markupBps?: number | null;
   oracleNgnPerUsd?: string | null;
@@ -291,10 +301,18 @@ export interface Product {
   name: string;
   categoryId: string;
   category?: Category;
-  /** CUR-001: closed set; renamed from free-text `currency`. */
+  /**
+   * What this product is priced in. PRICE-004 made the **region** the source of
+   * truth; this is a mirror the backend maintains, and it is not settable here.
+   */
   baseCurrency: 'NGN' | 'USD';
   isAvailable: boolean;
-  pricingMode: PricingMode;
+  /**
+   * PRICE-004: margin over cost, in basis points. `null` means the product
+   * follows the global markup; `0` means sell at cost. The two are different
+   * prices — see `lib/markup.ts`.
+   */
+  markupBps: number | null;
   priceUsd: string | null;
   snapshotNgnPrice: string;
   snapshotAt: string;

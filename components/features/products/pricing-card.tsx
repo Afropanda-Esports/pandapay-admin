@@ -1,13 +1,12 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Coins, Globe, Wallet } from 'lucide-react';
+import { Coins } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { getCurrentRate } from '@/lib/api/pricing';
 import { updateProductPricing } from '@/lib/api/products';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -24,19 +23,39 @@ import {
 import { Input } from '@/components/ui/input';
 import { usePermissions } from '@/hooks/use-permissions';
 import { formatMoney } from '@/lib/money';
-import { cn } from '@/lib/utils';
-import type { PricingMode, ProductWithStats } from '@/lib/types';
+import type { ProductWithStats } from '@/lib/types';
+import {
+  effectiveMarkupBps,
+  parseMarkupInput,
+  previewNgn,
+} from '@/lib/markup';
 
 interface PricingCardProps {
   product: ProductWithStats;
 }
 
-const MODE_DESCRIPTIONS: Record<PricingMode, string> = {
-  GLOBAL_FX:
-    'NGN price is derived from a USD face value × the global FX rate. Recomputes when the rate changes.',
-  MANUAL_NGN:
-    'NGN price is set directly. Ignores the global FX rate — use for SKUs whose wholesale fluctuates (Steam, iTunes, PSN).',
-};
+/**
+ * The field means three different things, and the difference is money:
+ * blank follows the global markup, 0 sells at cost, anything else is this
+ * product's own margin — and once it has one, changing the global will not
+ * move it.
+ */
+function markupHelp(
+  parsed: ReturnType<typeof parseMarkupInput>,
+  globalMarkupBps: number | null,
+): string {
+  if (parsed.error) return 'Basis points over cost — 1350 is 13.5%.';
+  const bps = parsed.markupBps ?? null;
+  if (bps === null) {
+    return globalMarkupBps === null
+      ? 'Blank — follows the global markup, which is not set yet.'
+      : `Blank — follows the global markup (${globalMarkupBps} bps). Changing the global will move this product.`;
+  }
+  if (bps === 0) {
+    return 'Zero margin — this product sells at cost, and ignores the global markup.';
+  }
+  return `${(bps / 100).toFixed(2)}% over cost. This overrides the global markup, so changing the global will not move this product.`;
+}
 
 export function PricingCard({ product }: Readonly<PricingCardProps>) {
   const queryClient = useQueryClient();
@@ -44,12 +63,12 @@ export function PricingCard({ product }: Readonly<PricingCardProps>) {
   const canEditPricing = can('products:pricing');
 
   // Local form state — initialised from the product, kept in sync if it reloads.
-  // PRICE-002 dropped manualPriceNgn from the product row; the NGN field seeds
-  // from snapshotNgnPrice (what the customer currently pays).
-  const [mode, setMode] = useState<PricingMode>(product.pricingMode);
+  // PRICE-004: the markup field is a string, not a number, because an empty
+  // field and a typed 0 mean different things and a numeric state would lose
+  // the distinction before `parseMarkupInput` ever sees it.
   const [priceUsd, setPriceUsd] = useState<string>(product.priceUsd ?? '');
-  const [manualPriceNgn, setManualPriceNgn] = useState<string>(
-    product.pricingMode === 'MANUAL_NGN' ? product.snapshotNgnPrice : '',
+  const [markupInput, setMarkupInput] = useState<string>(
+    product.markupBps === null ? '' : String(product.markupBps),
   );
   const [error, setError] = useState<string | null>(null);
 
@@ -65,23 +84,19 @@ export function PricingCard({ product }: Readonly<PricingCardProps>) {
 
   const mutation = useMutation({
     mutationFn: () => {
-      if (mode === 'GLOBAL_FX') {
-        const usd = Number.parseFloat(priceUsd);
-        if (!Number.isFinite(usd) || usd <= 0) {
-          throw new Error('Enter a USD face value greater than 0');
-        }
-        return updateProductPricing(product.id, {
-          pricingMode: 'GLOBAL_FX',
-          priceUsd: usd,
-        });
+      const usd = Number.parseFloat(priceUsd);
+      if (!Number.isFinite(usd) || usd <= 0) {
+        throw new Error('Enter a USD face value greater than 0');
       }
-      const ngn = Number.parseFloat(manualPriceNgn);
-      if (!Number.isFinite(ngn) || ngn <= 0) {
-        throw new Error('Enter a NGN price greater than 0');
-      }
+      const parsed = parseMarkupInput(markupInput);
+      if (parsed.error) throw new Error(parsed.error);
+
+      // `markupBps: null` is sent deliberately — it clears the product's own
+      // markup so it follows the global one again. Omitting the field would
+      // leave the existing markup in place, which is a different request.
       return updateProductPricing(product.id, {
-        pricingMode: 'MANUAL_NGN',
-        manualPriceNgn: ngn,
+        priceUsd: usd,
+        markupBps: parsed.markupBps ?? null,
       });
     },
     onSuccess: () => {
@@ -98,26 +113,27 @@ export function PricingCard({ product }: Readonly<PricingCardProps>) {
     },
   });
 
-  // Live NGN preview based on current form state + rate.
-  const previewNgn = (() => {
-    if (mode === 'MANUAL_NGN') {
-      const n = Number.parseFloat(manualPriceNgn);
-      return Number.isFinite(n) ? n.toFixed(2) : null;
-    }
-    if (rate == null) return null;
-    const usd = Number.parseFloat(priceUsd);
-    if (!Number.isFinite(usd)) return null;
-    return (usd * rate.ngnPerUsd).toFixed(2);
-  })();
+  const parsedMarkup = parseMarkupInput(markupInput);
+  const globalMarkupBps = rate?.markupBps ?? null;
 
-  const savedManualNgn =
-    product.pricingMode === 'MANUAL_NGN' ? product.snapshotNgnPrice : '';
+  // Live preview of what the backend will compute. Uses the ORACLE rate, not
+  // the selling rate: the selling rate already carries the global markup, and
+  // multiplying by it would compound the two.
+  const preview =
+    parsedMarkup.error !== undefined || globalMarkupBps === null
+      ? null
+      : previewNgn(
+          priceUsd,
+          rate?.oracleNgnPerUsd ?? null,
+          effectiveMarkupBps(parsedMarkup.markupBps ?? null, globalMarkupBps),
+        );
+
+  const savedMarkupInput =
+    product.markupBps === null ? '' : String(product.markupBps);
 
   // True iff the form values differ from what's saved.
   const isDirty =
-    mode !== product.pricingMode ||
-    (mode === 'GLOBAL_FX' && priceUsd !== (product.priceUsd ?? '')) ||
-    (mode === 'MANUAL_NGN' && manualPriceNgn !== savedManualNgn);
+    priceUsd !== (product.priceUsd ?? '') || markupInput !== savedMarkupInput;
 
   return (
     <Card>
@@ -130,7 +146,7 @@ export function PricingCard({ product }: Readonly<PricingCardProps>) {
       <CardContent className="space-y-4">
         {!canEditPricing ? (
           <p className="text-sm text-muted-foreground">
-            Pricing mode changes require Super Admin. Managers can upload vouchers
+            Pricing changes require Super Admin. Managers can upload vouchers
             and toggle availability.
           </p>
         ) : null}
@@ -143,92 +159,82 @@ export function PricingCard({ product }: Readonly<PricingCardProps>) {
           </span>
         </div>
 
-        <div className="space-y-2">
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">
-            Pricing mode
-          </p>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <ModeOption
-              icon={Globe}
-              label="Global FX"
-              selected={mode === 'GLOBAL_FX'}
-            onClick={() => {
-              if (!canEditPricing) return;
-              setMode('GLOBAL_FX');
-              setError(null);
-            }}
-            />
-            <ModeOption
-              icon={Wallet}
-              label="Manual NGN"
-              selected={mode === 'MANUAL_NGN'}
-              onClick={() => {
-                if (!canEditPricing) return;
-                setMode('MANUAL_NGN');
-                setError(null);
-              }}
-            />
-          </div>
-          <p className="text-xs text-muted-foreground">
-            {MODE_DESCRIPTIONS[mode]}
-          </p>
+        <div className="flex items-baseline justify-between border-b border-border/60 pb-3">
+          <span className="text-xs uppercase tracking-wide text-muted-foreground">
+            Currency
+          </span>
+          <span className="text-sm tabular-nums">
+            {product.baseCurrency}
+            <span className="ml-2 text-xs text-muted-foreground">
+              from its region
+            </span>
+          </span>
         </div>
 
         <FieldGroup>
-          {mode === 'GLOBAL_FX' ? (
-            <Field>
-              <FieldLabel htmlFor="price-usd">USD face value</FieldLabel>
-              <div className="relative">
-                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
-                  $
-                </span>
-                <Input
-                  id="price-usd"
-                  type="number"
-                  inputMode="decimal"
-                  step="0.01"
-                  min="0.01"
-                  placeholder="10.00"
-                  value={priceUsd}
-                  onChange={(e) => {
-                    setPriceUsd(e.target.value);
-                    setError(null);
-                  }}
-                  disabled={mutation.isPending || !canEditPricing}
-                  className="pl-7"
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {rate
-                  ? `Current rate: ₦${rate.ngnPerUsd.toLocaleString('en-NG')} / $1`
-                  : 'No FX rate set — set one on the Pricing page before saving.'}
-              </p>
-            </Field>
-          ) : (
-            <Field>
-              <FieldLabel htmlFor="price-ngn">Manual NGN price</FieldLabel>
-              <div className="relative">
-                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
-                  ₦
-                </span>
-                <Input
-                  id="price-ngn"
-                  type="number"
-                  inputMode="numeric"
-                  step="any"
-                  min="1"
-                  placeholder="5000"
-                  value={manualPriceNgn}
-                  onChange={(e) => {
-                    setManualPriceNgn(e.target.value);
-                    setError(null);
-                  }}
-                  disabled={mutation.isPending || !canEditPricing}
-                  className="pl-7"
-                />
-              </div>
-            </Field>
-          )}
+          <Field>
+            <FieldLabel htmlFor="price-usd">Face value</FieldLabel>
+            <div className="relative">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                $
+              </span>
+              <Input
+                id="price-usd"
+                type="number"
+                inputMode="decimal"
+                step="0.01"
+                min="0.01"
+                placeholder="10.00"
+                value={priceUsd}
+                onChange={(e) => {
+                  setPriceUsd(e.target.value);
+                  setError(null);
+                }}
+                disabled={mutation.isPending || !canEditPricing}
+                className="pl-7"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              What the card is worth. The naira price is derived from this.
+            </p>
+          </Field>
+
+          <Field>
+            <FieldLabel htmlFor="markup-bps">Markup</FieldLabel>
+            <div className="relative">
+              <Input
+                id="markup-bps"
+                // Deliberately `text`, not `number`: a number input hands back
+                // an empty string for "-" and other partial entries, and the
+                // difference between blank and 0 is the whole point here.
+                type="text"
+                inputMode="numeric"
+                placeholder={
+                  globalMarkupBps === null
+                    ? 'Global markup not set'
+                    : `${globalMarkupBps} (global)`
+                }
+                value={markupInput}
+                onChange={(e) => {
+                  setMarkupInput(e.target.value);
+                  setError(null);
+                }}
+                disabled={mutation.isPending || !canEditPricing}
+                className="pr-12"
+              />
+              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                bps
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {markupHelp(parsedMarkup, globalMarkupBps)}
+            </p>
+            {parsedMarkup.error ? (
+              <FieldError className="text-error-700">
+                {parsedMarkup.error}
+              </FieldError>
+            ) : null}
+          </Field>
 
           {error && (
             <FieldError className="text-error-700">{error}</FieldError>
@@ -236,13 +242,15 @@ export function PricingCard({ product }: Readonly<PricingCardProps>) {
 
           <div className="flex items-center justify-between gap-3 pt-1">
             <div className="text-xs text-muted-foreground">
-              {previewNgn === null ? (
-                'Enter a value to preview'
+              {preview === null ? (
+                globalMarkupBps === null
+                  ? 'No FX rate set — set one on the Pricing page first.'
+                  : 'Enter a face value to preview'
               ) : (
                 <>
                   Will save as{' '}
                   <span className="font-mono text-sm text-foreground">
-                    {formatMoney(previewNgn, 'NGN')}
+                    {formatMoney(preview, 'NGN')}
                   </span>
                 </>
               )}
@@ -251,7 +259,7 @@ export function PricingCard({ product }: Readonly<PricingCardProps>) {
               <Button
                 type="button"
                 onClick={() => mutation.mutate()}
-                disabled={mutation.isPending || !isDirty || previewNgn === null}
+                disabled={mutation.isPending || !isDirty || preview === null}
               >
                 {mutation.isPending ? 'Saving…' : 'Save pricing'}
               </Button>
@@ -260,38 +268,5 @@ export function PricingCard({ product }: Readonly<PricingCardProps>) {
         </FieldGroup>
       </CardContent>
     </Card>
-  );
-}
-
-function ModeOption({
-  icon: Icon,
-  label,
-  selected,
-  onClick,
-}: Readonly<{
-  icon: typeof Globe;
-  label: string;
-  selected: boolean;
-  onClick: () => void;
-}>) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        'flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm transition-colors',
-        selected
-          ? 'border-primary bg-primary/10 text-foreground'
-          : 'hover:bg-muted text-muted-foreground',
-      )}
-    >
-      <Icon className="size-4" />
-      <span className="font-medium">{label}</span>
-      {selected && (
-        <Badge className="ml-auto bg-primary text-primary-foreground hover:bg-primary border-0 text-[10px] px-1.5 py-0">
-          Active
-        </Badge>
-      )}
-    </button>
   );
 }

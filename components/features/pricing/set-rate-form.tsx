@@ -9,6 +9,7 @@ import { z } from 'zod';
 
 import { ApiError } from '@/lib/api/client';
 import { setRate } from '@/lib/api/pricing';
+import { previewNgn } from '@/lib/markup';
 import { getProducts } from '@/lib/api/products';
 import { Button } from '@/components/ui/button';
 import {
@@ -48,15 +49,20 @@ interface PreviewRow {
 
 function buildPreview(
   products: ProductWithStats[] | undefined,
-  newRate: number,
+  oracleRate: number | null,
+  newMarkupBps: number,
 ): PreviewRow[] {
   if (!products) return [];
   const rows: PreviewRow[] = [];
   for (const p of products) {
-    if (p.pricingMode !== 'GLOBAL_FX' || p.priceUsd == null) continue;
-    const usd = Number.parseFloat(p.priceUsd);
+    // PRICE-004: only products that follow the global markup move when it
+    // changes. One with its own markup ignores the global entirely, so listing
+    // it here would promise a change that never happens.
+    if (p.markupBps !== null || p.priceUsd == null) continue;
     const currentNgn = Number.parseFloat(p.snapshotNgnPrice);
-    const newNgn = Number.parseFloat((usd * newRate).toFixed(2));
+    const previewed = previewNgn(p.priceUsd, oracleRate, newMarkupBps);
+    if (previewed === null) continue;
+    const newNgn = Number.parseFloat(previewed);
     rows.push({
       productId: p.id,
       name: p.name,
@@ -83,7 +89,7 @@ function describeOverallDelta(
 }
 
 function formatRecomputedSummary(affected: number): string {
-  if (affected === 0) return 'No GLOBAL_FX products to recompute.';
+  if (affected === 0) return 'No products needed recomputing.';
   const noun = affected === 1 ? 'product' : 'products';
   return `Recomputed ${affected} ${noun}.`;
 }
@@ -120,13 +126,22 @@ export function SetRateForm({
     enabled: isDraftValid,
   });
 
-  const previewRows = isDraftValid && draftRate ? buildPreview(products, draftRate) : [];
+  const previewRows =
+    isDraftValid && oracleRate
+      ? buildPreview(products, oracleRate, Math.round(draftMarkupPct * 100))
+      : [];
   const overallDelta = isDraftValid && draftRate
     ? describeOverallDelta(currentRate, draftRate)
     : null;
   const hasGlobalFxProducts = (products ?? []).some(
-    (p) => p.pricingMode === 'GLOBAL_FX' && p.priceUsd != null,
+    (p) => p.markupBps === null && p.priceUsd != null,
   );
+  // Products with their own markup are unaffected by the global one, and the
+  // admin needs telling — otherwise a global change that moves nothing reads
+  // as a broken save.
+  const overridingProductCount = (products ?? []).filter(
+    (p) => p.markupBps !== null && p.priceUsd != null,
+  ).length;
 
   const mutation = useMutation({
     mutationFn: (data: z.output<typeof schema>) =>
@@ -200,6 +215,7 @@ export function SetRateForm({
                 draftRate={draftRate}
                 overallDelta={overallDelta}
                 hasGlobalFxProducts={hasGlobalFxProducts}
+                overridingProductCount={overridingProductCount}
                 rows={previewRows}
               />
             )}
@@ -220,23 +236,38 @@ function RatePreview({
   draftRate,
   overallDelta,
   hasGlobalFxProducts,
+  overridingProductCount,
   rows,
 }: Readonly<{
   draftRate: number;
   overallDelta: { pct: number; direction: DeltaDirection } | null;
   hasGlobalFxProducts: boolean;
+  overridingProductCount: number;
   rows: PreviewRow[];
 }>) {
+  // PRICE-004: a product with its own markup ignores the global one. Without
+  // saying so, a rate change that visibly moves nothing reads as a failed save.
+  const overrideNotice =
+    overridingProductCount > 0 ? (
+      <p className="mt-2 text-xs text-muted-foreground">
+        {overridingProductCount} product
+        {overridingProductCount === 1 ? '' : 's'} set their own markup and will
+        not move.
+      </p>
+    ) : null;
+
   if (!hasGlobalFxProducts) {
     return (
       <div className="rounded-lg border border-dashed border-border bg-muted/30 p-3 text-xs text-muted-foreground">
-        No products use Global FX pricing yet. Saving will set the rate for any
-        product flipped to GLOBAL_FX later.
+        No product follows the global markup, so changing it moves nothing
+        today.
+        {overrideNotice}
       </div>
     );
   }
 
   const visible = rows.slice(0, PREVIEW_LIMIT);
+
   const hidden = rows.length - visible.length;
 
   let DeltaIcon = Minus;
@@ -253,8 +284,8 @@ function RatePreview({
     <div className="rounded-lg border border-warning-200 bg-warning-50 dark:border-warning-700/40 dark:bg-warning-700/10 p-3 space-y-2">
       <div className="flex items-center justify-between text-xs font-medium">
         <span>
-          {rows.length} GLOBAL_FX product{rows.length === 1 ? '' : 's'} will be
-          repriced at ₦{draftRate.toLocaleString('en-NG')} / $1
+          {rows.length} product{rows.length === 1 ? '' : 's'} will be repriced
+          at ₦{draftRate.toLocaleString('en-NG')} / $1
         </span>
         {overallDelta && (
           <span className={cn('inline-flex items-center gap-1', deltaTone)}>
@@ -283,6 +314,7 @@ function RatePreview({
           + {hidden} more product{hidden === 1 ? '' : 's'}
         </div>
       )}
+      {overrideNotice}
     </div>
   );
 }
