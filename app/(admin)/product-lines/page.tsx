@@ -10,7 +10,12 @@ import { PageHeader } from '@/components/shared/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getProductBrands, getProductLines } from '@/lib/api/products';
+import {
+  getProductBrands,
+  getProductLines,
+  getRegions,
+} from '@/lib/api/products';
+import { brandLabel } from '@/lib/catalog-forms';
 
 export default function ProductLinesPage() {
   const { data, isLoading, isError, refetch } = useQuery({
@@ -23,8 +28,18 @@ export default function ProductLinesPage() {
     staleTime: 60_000,
   });
 
-  const brandName = (id: string) =>
-    brands?.find((brand) => brand.id === id)?.name ?? '—';
+  const { data: regions } = useQuery({
+    queryKey: ['regions'],
+    queryFn: getRegions,
+    staleTime: 60_000,
+  });
+
+  // Same reason as the create dialog: one brand row per region means the bare
+  // name does not identify which brand a line belongs to.
+  const brandName = (id: string) => {
+    const brand = brands?.find((candidate) => candidate.id === id);
+    return brand ? brandLabel(brand, regions) : '—';
+  };
 
   return (
     <div>

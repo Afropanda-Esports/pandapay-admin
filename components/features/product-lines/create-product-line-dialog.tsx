@@ -34,9 +34,16 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ApiError } from '@/lib/api/client';
-import { createProductLine, getProductBrands } from '@/lib/api/products';
-import { CATALOG_NAME_MAX_LENGTH, catalogNameIssue } from '@/lib/catalog-forms';
-import { toSelectItems } from '@/lib/select-items';
+import {
+  createProductLine,
+  getProductBrands,
+  getRegions,
+} from '@/lib/api/products';
+import {
+  CATALOG_NAME_MAX_LENGTH,
+  brandLabel,
+  catalogNameIssue,
+} from '@/lib/catalog-forms';
 import { usePermissions } from '@/hooks/use-permissions';
 
 const schema = z.object({
@@ -60,6 +67,14 @@ export function CreateProductLineDialog() {
   const { data: brands } = useQuery({
     queryKey: ['product-brands'],
     queryFn: () => getProductBrands(),
+    staleTime: 60_000,
+  });
+
+  // Brands are region-scoped, so the list holds one entry per region for each
+  // platform. Without the region in the label they are indistinguishable.
+  const { data: regions } = useQuery({
+    queryKey: ['regions'],
+    queryFn: getRegions,
     staleTime: 60_000,
   });
 
@@ -92,7 +107,9 @@ export function CreateProductLineDialog() {
 
   if (!canManage) return null;
 
-  const brandItems = toSelectItems(brands);
+  const brandItems = Object.fromEntries(
+    (brands ?? []).map((brand) => [brand.id, brandLabel(brand, regions)]),
+  );
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -140,7 +157,7 @@ export function CreateProductLineDialog() {
                     <SelectContent>
                       {(brands ?? []).map((brand) => (
                         <SelectItem key={brand.id} value={brand.id}>
-                          {brand.name}
+                          {brandLabel(brand, regions)}
                         </SelectItem>
                       ))}
                       {brands?.length === 0 && (
