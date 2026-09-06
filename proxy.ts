@@ -15,7 +15,7 @@ const PROTECTED_PATHS = [
   '/payment-exceptions',
   '/support-requests',
   '/feature-flags',
-  '/discount-codes',
+  '/voucher-codes',
   '/change-password',
 ];
 
@@ -62,7 +62,7 @@ export const config = {
     '/payment-exceptions/:path*',
     '/support-requests/:path*',
     '/feature-flags/:path*',
-    '/discount-codes/:path*',
+    '/voucher-codes/:path*',
     '/change-password',
     '/login',
   ],

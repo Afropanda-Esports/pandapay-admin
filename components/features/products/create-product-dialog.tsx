@@ -37,6 +37,7 @@ import {
 } from '@/lib/api/products';
 import { getCategories } from '@/lib/api/categories';
 import { usdPriceHelp } from '@/lib/catalog-forms';
+import { baseCurrencyFor } from '@/lib/money';
 import { toSelectItems } from '@/lib/select-items';
 import type { PricingMode } from '@/lib/types';
 
@@ -50,12 +51,6 @@ const schema = z
     pricingMode: z.enum(['MANUAL_NGN', 'GLOBAL_FX']),
     manualPriceNgn: z.coerce.number().optional(),
     priceUsd: z.coerce.number().optional(),
-    currency: z
-      .string()
-      .trim()
-      .min(3, 'Use a 3-letter code')
-      .max(3)
-      .default('NGN'),
   })
   .superRefine((data, ctx) => {
     // DISC-008: every product carries a dollar value, in both pricing modes —
@@ -120,13 +115,12 @@ export function CreateProductDialog() {
       pricingMode: 'MANUAL_NGN',
       manualPriceNgn: '' as unknown as number,
       priceUsd: '' as unknown as number,
-      currency: 'NGN',
     },
   });
 
   const pricingMode = form.watch('pricingMode') as PricingMode;
+  const baseCurrency = baseCurrencyFor(pricingMode);
   const watchRegionId = form.watch('regionId');
-  const watchCategoryId = form.watch('categoryId');
   const watchBrandId = form.watch('brandId');
 
   // CAT-007: brands are scoped to a region only. The category gate that used to
@@ -151,6 +145,7 @@ export function CreateProductDialog() {
 
   const mutation = useMutation({
     mutationFn: (data: z.output<typeof schema>) => {
+      const derivedCurrency = baseCurrencyFor(data.pricingMode);
       if (data.pricingMode === 'GLOBAL_FX') {
         if (!rate) {
           throw new Error(
@@ -162,7 +157,7 @@ export function CreateProductDialog() {
           lineId: data.lineId,
           name: data.name,
           categoryId: data.categoryId,
-          currency: data.currency,
+          baseCurrency: derivedCurrency,
           pricingMode: 'GLOBAL_FX',
           priceUsd: data.priceUsd,
         });
@@ -172,7 +167,7 @@ export function CreateProductDialog() {
         lineId: data.lineId,
         name: data.name,
         categoryId: data.categoryId,
-        currency: data.currency,
+        baseCurrency: derivedCurrency,
         pricingMode: 'MANUAL_NGN',
         manualPriceNgn: data.manualPriceNgn,
         priceUsd: data.priceUsd,
@@ -409,6 +404,11 @@ export function CreateProductDialog() {
                   </Select>
                 )}
               />
+              <p className="text-xs text-muted-foreground">
+                Base currency: <span className="font-medium text-foreground">{baseCurrency}</span>
+                {' — '}
+                derived from pricing mode (cannot be set separately).
+              </p>
             </Field>
 
             {pricingMode === 'MANUAL_NGN' ? (
@@ -454,19 +454,6 @@ export function CreateProductDialog() {
                 {usdPriceHelp(pricingMode, rate?.ngnPerUsd)}
               </p>
               <FieldError>{form.formState.errors.priceUsd?.message}</FieldError>
-            </Field>
-
-            <Field>
-              <FieldLabel htmlFor="product-currency">Currency</FieldLabel>
-              <Input
-                id="product-currency"
-                maxLength={3}
-                disabled={mutation.isPending}
-                {...form.register('currency')}
-              />
-              <FieldError>
-                {form.formState.errors.currency?.message}
-              </FieldError>
             </Field>
           </FieldGroup>
 

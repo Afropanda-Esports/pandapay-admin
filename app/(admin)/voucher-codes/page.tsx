@@ -6,8 +6,11 @@ import { AlertCircle, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
-import { DiscountStatusBadge, deriveDiscountCodeStatus } from '@/components/features/discount-codes/discount-status-badge';
-import { GenerateDiscountCodesDialog } from '@/components/features/discount-codes/generate-discount-codes-dialog';
+import { GenerateVoucherCodesDialog } from '@/components/features/voucher-codes/generate-voucher-codes-dialog';
+import {
+  VoucherStatusBadge,
+  deriveVoucherCodeStatus,
+} from '@/components/features/voucher-codes/voucher-status-badge';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { EmptyState } from '@/components/shared/empty-state';
 import { PageHeader } from '@/components/shared/page-header';
@@ -15,13 +18,14 @@ import { PaginationControls } from '@/components/shared/pagination-controls';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { usePermissions } from '@/hooks/use-permissions';
-import { listDiscountCodes, revokeDiscountCode } from '@/lib/api/discount-codes';
 import { ApiError } from '@/lib/api/client';
-import type { DiscountCode, DiscountCodeStatus } from '@/lib/types';
+import { listVoucherCodes, revokeVoucherCode } from '@/lib/api/voucher-codes';
+import { formatMoney, isSupportedCurrency } from '@/lib/money';
+import type { VoucherCode, VoucherCodeStatus } from '@/lib/types';
 
 const PAGE_SIZE = 20;
 
-const STATUS_TABS: { value: DiscountCodeStatus | 'ALL'; label: string }[] = [
+const STATUS_TABS: { value: VoucherCodeStatus | 'ALL'; label: string }[] = [
   { value: 'ACTIVE', label: 'Active' },
   { value: 'USED', label: 'Used' },
   { value: 'EXPIRED', label: 'Expired' },
@@ -30,34 +34,38 @@ const STATUS_TABS: { value: DiscountCodeStatus | 'ALL'; label: string }[] = [
 ];
 
 /**
- * DISC-008: codes are denominated in US dollars, so the value is shown in the
- * unit it is actually stored in. Converting it to naira for display would
- * reintroduce exactly the drift the dollar denomination removes — the figure
- * would change between page loads as the rate moved.
+ * VOUCH-001: show the face value in its own currency — never convert for
+ * display (that would reintroduce FX drift between page loads).
  */
-function formatDiscountValue(code: DiscountCode) {
-  const n = Number.parseFloat(code.valueUsd);
-  return Number.isFinite(n) ? `$${n.toFixed(2)}` : `$${code.valueUsd}`;
+function formatVoucherValue(code: VoucherCode) {
+  if (!isSupportedCurrency(code.currency)) {
+    return `${code.value} ${code.currency}`;
+  }
+  try {
+    return formatMoney(code.value, code.currency);
+  } catch {
+    return `${code.value} ${code.currency}`;
+  }
 }
 
-export default function DiscountCodesPage() {
+export default function VoucherCodesPage() {
   const queryClient = useQueryClient();
   const { can } = usePermissions();
-  const canManage = can('discount-codes:manage');
+  const canManage = can('voucher-codes:manage');
   const [page, setPage] = useState(1);
-  const [statusFilter, setStatusFilter] = useState<DiscountCodeStatus | 'ALL'>('ACTIVE');
+  const [statusFilter, setStatusFilter] = useState<VoucherCodeStatus | 'ALL'>('ACTIVE');
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['discount-codes', page, statusFilter],
+    queryKey: ['voucher-codes', page, statusFilter],
     queryFn: () =>
-      listDiscountCodes(page, PAGE_SIZE, statusFilter === 'ALL' ? undefined : statusFilter),
+      listVoucherCodes(page, PAGE_SIZE, statusFilter === 'ALL' ? undefined : statusFilter),
   });
 
   const revoke = useMutation({
-    mutationFn: revokeDiscountCode,
+    mutationFn: revokeVoucherCode,
     onSuccess: () => {
-      toast.success('Discount code revoked');
-      queryClient.invalidateQueries({ queryKey: ['discount-codes'] });
+      toast.success('Voucher code revoked');
+      queryClient.invalidateQueries({ queryKey: ['voucher-codes'] });
     },
     onError: (err) => {
       const message = err instanceof ApiError ? err.message : 'Could not revoke code';
@@ -70,9 +78,9 @@ export default function DiscountCodesPage() {
   return (
     <div>
       <PageHeader
-        title="Discount Codes"
-        description="Single-use codes redeemable against a product or category."
-        actions={canManage ? <GenerateDiscountCodesDialog /> : undefined}
+        title="Voucher Codes"
+        description="Single-use fixed-amount vouchers in NGN or USD. Each applies only to cart items in the same currency."
+        actions={canManage ? <GenerateVoucherCodesDialog /> : undefined}
       />
 
       <div className="mb-4 flex flex-wrap gap-2">
@@ -94,7 +102,7 @@ export default function DiscountCodesPage() {
       {isError ? (
         <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed py-16 text-muted-foreground">
           <AlertCircle className="size-8" />
-          <p>Failed to load discount codes.</p>
+          <p>Failed to load voucher codes.</p>
           <Button variant="outline" size="sm" onClick={() => refetch()}>
             <RefreshCw className="mr-2 size-4" /> Retry
           </Button>
@@ -103,7 +111,7 @@ export default function DiscountCodesPage() {
         <Skeleton className="h-64 w-full" />
       ) : codes.length === 0 ? (
         <EmptyState
-          title="No discount codes"
+          title="No voucher codes"
           message="No codes match this filter yet."
         />
       ) : (
@@ -113,7 +121,7 @@ export default function DiscountCodesPage() {
               <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
                 <tr>
                   <th className="px-3 py-2 font-medium">Code</th>
-                  <th className="px-3 py-2 font-medium">Discount</th>
+                  <th className="px-3 py-2 font-medium">Value</th>
                   <th className="px-3 py-2 font-medium">Status</th>
                   <th className="px-3 py-2 font-medium">Expires</th>
                   <th className="px-3 py-2 font-medium">Recipient</th>
@@ -124,9 +132,9 @@ export default function DiscountCodesPage() {
                 {codes.map((code) => (
                   <tr key={code.id} className="border-t border-border/60 align-middle">
                     <td className="px-3 py-2 font-mono text-xs">{code.code}</td>
-                    <td className="px-3 py-2">{formatDiscountValue(code)}</td>
+                    <td className="px-3 py-2">{formatVoucherValue(code)}</td>
                     <td className="px-3 py-2">
-                      <DiscountStatusBadge code={code} />
+                      <VoucherStatusBadge code={code} />
                     </td>
                     <td className="px-3 py-2 text-xs text-muted-foreground">
                       {format(parseISO(code.expiresAt), 'PP')}
@@ -135,14 +143,14 @@ export default function DiscountCodesPage() {
                       {code.recipientLabel ?? '—'}
                     </td>
                     <td className="px-3 py-2 text-right">
-                      {canManage && deriveDiscountCodeStatus(code) === 'ACTIVE' ? (
+                      {canManage && deriveVoucherCodeStatus(code) === 'ACTIVE' ? (
                         <ConfirmDialog
                           trigger={
                             <Button size="sm" variant="outline">
                               Revoke
                             </Button>
                           }
-                          title="Revoke this discount code?"
+                          title="Revoke this voucher code?"
                           description={`${code.code} will no longer be redeemable. This can't be undone.`}
                           confirmLabel="Revoke"
                           variant="destructive"

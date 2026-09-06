@@ -71,6 +71,22 @@
       "verify": "node --experimental-strip-types --test lib/api/support-requests.spec.ts && pnpm exec tsc --noEmit && pnpm lint && pnpm build",
       "status": "PENDING_REVIEW",
       "notes": "Contract: skills/.harness/contracts/SUPPORT-001-FE.md — EXECUTED 2026-08-30. Support queue page + resolve dialog mirroring payment-exceptions. Branch feat/support-001-fe-admin-support-queue. VERIFY: 2/2 node:test, tsc+lint+build green."
+    },
+    {
+      "id": "CUR-001-FE",
+      "name": "Currency selector + product form API alignment (baseCurrency)",
+      "priority": 1,
+      "verify": "pnpm test:unit && pnpm exec tsc --noEmit && pnpm lint && pnpm build",
+      "status": "PENDING_REVIEW",
+      "notes": "Contract: skills/.harness/contracts/CUR-001-FE.md — EXECUTED. D1(a): baseCurrency derived from pricingMode. Sends baseCurrency; drops currency/manualPriceNgn reads. Shared lib/money.ts formatter."
+    },
+    {
+      "id": "VOUCH-001-FE",
+      "name": "Admin voucher rename + currency on generate (companion to VOUCH-001)",
+      "priority": 1,
+      "verify": "pnpm exec tsc --noEmit && node --experimental-strip-types --test lib/select-items.spec.ts",
+      "status": "PENDING_REVIEW",
+      "notes": "Companion to pandapay-be VOUCH-001. On feat/cur-001-fe-currency-selector with CUR-001-FE. Renamed discount→voucher; generate requires value+currency. VERIFY: tsc 0 after clearing stale .next/types; select-items 12/12."
     }
   ]
 }

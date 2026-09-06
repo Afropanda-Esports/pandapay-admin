@@ -22,18 +22,11 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { getProducts } from '@/lib/api/products';
+import { formatProductPrice } from '@/lib/money';
 import type { ProductWithStats } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 const SKELETON_KEYS = ['s1', 's2', 's3', 's4', 's5', 's6'];
-
-const formatPrice = (price: string, currency: string) => {
-  const n = Number.parseFloat(price);
-  const formatted = Number.isFinite(n)
-    ? n.toLocaleString('en-NG', { maximumFractionDigits: 2 })
-    : price;
-  return currency === 'NGN' ? `₦${formatted}` : `${formatted} ${currency}`;
-};
 
 const stockBarColor = (available: number, total: number) => {
   if (total === 0) return 'bg-neutral-300';
@@ -105,7 +98,7 @@ function ProductCard({ product }: Readonly<{ product: ProductWithStats }>) {
         </div>
         <p className="text-xs text-muted-foreground">
           {product.category?.name || 'Unknown'} ·{' '}
-          {formatPrice(product.snapshotNgnPrice, product.currency)}
+          {formatProductPrice(product)}
         </p>
       </CardHeader>
       <CardContent>

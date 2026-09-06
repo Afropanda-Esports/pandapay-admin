@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { usePermissions } from '@/hooks/use-permissions';
+import { formatMoney } from '@/lib/money';
 import { cn } from '@/lib/utils';
 import type { PricingMode, ProductWithStats } from '@/lib/types';
 
@@ -37,22 +38,18 @@ const MODE_DESCRIPTIONS: Record<PricingMode, string> = {
     'NGN price is set directly. Ignores the global FX rate — use for SKUs whose wholesale fluctuates (Steam, iTunes, PSN).',
 };
 
-function formatPriceNgn(value: string): string {
-  const n = Number.parseFloat(value);
-  if (!Number.isFinite(n)) return value;
-  return `₦${n.toLocaleString('en-NG', { maximumFractionDigits: 2 })}`;
-}
-
 export function PricingCard({ product }: Readonly<PricingCardProps>) {
   const queryClient = useQueryClient();
   const { can } = usePermissions();
   const canEditPricing = can('products:pricing');
 
   // Local form state — initialised from the product, kept in sync if it reloads.
+  // PRICE-002 dropped manualPriceNgn from the product row; the NGN field seeds
+  // from snapshotNgnPrice (what the customer currently pays).
   const [mode, setMode] = useState<PricingMode>(product.pricingMode);
   const [priceUsd, setPriceUsd] = useState<string>(product.priceUsd ?? '');
   const [manualPriceNgn, setManualPriceNgn] = useState<string>(
-    product.manualPriceNgn ?? '',
+    product.pricingMode === 'MANUAL_NGN' ? product.snapshotNgnPrice : '',
   );
   const [error, setError] = useState<string | null>(null);
 
@@ -113,12 +110,14 @@ export function PricingCard({ product }: Readonly<PricingCardProps>) {
     return (usd * rate.ngnPerUsd).toFixed(2);
   })();
 
+  const savedManualNgn =
+    product.pricingMode === 'MANUAL_NGN' ? product.snapshotNgnPrice : '';
+
   // True iff the form values differ from what's saved.
   const isDirty =
     mode !== product.pricingMode ||
     (mode === 'GLOBAL_FX' && priceUsd !== (product.priceUsd ?? '')) ||
-    (mode === 'MANUAL_NGN' &&
-      manualPriceNgn !== (product.manualPriceNgn ?? ''));
+    (mode === 'MANUAL_NGN' && manualPriceNgn !== savedManualNgn);
 
   return (
     <Card>
@@ -140,7 +139,7 @@ export function PricingCard({ product }: Readonly<PricingCardProps>) {
             Current price
           </span>
           <span className="font-heading text-2xl font-bold tabular-nums">
-            {formatPriceNgn(product.snapshotNgnPrice)}
+            {formatMoney(product.snapshotNgnPrice, 'NGN')}
           </span>
         </div>
 
@@ -243,7 +242,7 @@ export function PricingCard({ product }: Readonly<PricingCardProps>) {
                 <>
                   Will save as{' '}
                   <span className="font-mono text-sm text-foreground">
-                    ₦{Number.parseFloat(previewNgn).toLocaleString('en-NG')}
+                    {formatMoney(previewNgn, 'NGN')}
                   </span>
                 </>
               )}
