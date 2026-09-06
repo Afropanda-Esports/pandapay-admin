@@ -9,6 +9,24 @@ import type { PricingMode } from '@/lib/types';
 export const CATALOG_NAME_MAX_LENGTH = 24;
 
 /**
+ * Brands are scoped to a region, so the same platform exists once per region —
+ * a list showing bare names renders "PlayStation" twice with no way to tell
+ * them apart, and picking the wrong one files a product line under the wrong
+ * region.
+ *
+ * Falls back to the bare name when regions have not loaded yet, or when the
+ * brand points at a region that is not in the list, rather than rendering
+ * "PlayStation — undefined".
+ */
+export function brandLabel(
+  brand: { name: string; regionId: string },
+  regions: readonly { id: string; name: string }[] | undefined,
+): string {
+  const region = regions?.find((candidate) => candidate.id === brand.regionId);
+  return region ? `${brand.name} — ${region.name}` : brand.name;
+}
+
+/**
  * Brand names come from `GET /admin/product-brands/allowed-names`, never from a
  * list in this repo. The backend constrains the field with `@IsIn(LAUNCH_BRANDS)`
  * and the WhatsApp bot matches customer messages against the same constant — a
