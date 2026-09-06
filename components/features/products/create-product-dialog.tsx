@@ -129,11 +129,13 @@ export function CreateProductDialog() {
   const watchCategoryId = form.watch('categoryId');
   const watchBrandId = form.watch('brandId');
 
+  // CAT-007: brands are scoped to a region only. The category gate that used to
+  // sit here kept the Brand dropdown disabled until a category was picked, long
+  // after category stopped scoping brands at all.
   const { data: brands, isFetching: isFetchingBrands } = useQuery({
-    queryKey: ['product-brands', watchRegionId, watchCategoryId],
-    queryFn: () =>
-      getProductBrands(watchRegionId, watchCategoryId),
-    enabled: !!watchRegionId && !!watchCategoryId,
+    queryKey: ['product-brands', watchRegionId],
+    queryFn: () => getProductBrands(watchRegionId),
+    enabled: !!watchRegionId,
     staleTime: 60_000,
   });
 
@@ -303,10 +305,18 @@ export function CreateProductDialog() {
                       field.onChange(v);
                       form.setValue('lineId', ''); // reset line
                     }}
-                    disabled={mutation.isPending || !watchRegionId || !watchCategoryId || isFetchingBrands}
+                    disabled={
+                      mutation.isPending || !watchRegionId || isFetchingBrands
+                    }
                   >
                     <SelectTrigger id="product-brand" className="w-full">
-                      <SelectValue placeholder={!watchRegionId || !watchCategoryId ? 'Select region & category first' : 'Select a brand'} />
+                      <SelectValue
+                        placeholder={
+                          watchRegionId
+                            ? 'Select a brand'
+                            : 'Select a region first'
+                        }
+                      />
                     </SelectTrigger>
                     <SelectContent>
                       {brands?.map((b) => (
