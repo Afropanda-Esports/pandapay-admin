@@ -5,6 +5,7 @@ import {
   CATALOG_NAME_MAX_LENGTH,
   brandNameItems,
   catalogNameIssue,
+  brandLabel,
   usdPriceHelp,
 } from './catalog-forms.ts';
 
@@ -84,5 +85,38 @@ describe('usdPriceHelp', () => {
 
   it('says the rate is missing rather than showing a blank one', () => {
     assert.match(usdPriceHelp('GLOBAL_FX'), /no fx rate set/i);
+  });
+});
+
+describe('brandLabel', () => {
+  const regions = [
+    { id: 'r-us', name: 'USA' },
+    { id: 'r-uk', name: 'United Kingdom' },
+  ];
+
+  /**
+   * Brands are region-scoped, so the same platform exists once per region. A
+   * dropdown listing them by name alone shows "PlayStation" twice with no way
+   * to tell which is which — and picking the wrong one files a product line
+   * under the wrong region.
+   */
+  it('qualifies the brand with its region', () => {
+    assert.equal(
+      brandLabel({ id: 'b1', name: 'PlayStation', regionId: 'r-us' }, regions),
+      'PlayStation — USA',
+    );
+  });
+
+  it('distinguishes the same brand in two regions', () => {
+    const us = brandLabel({ id: 'b1', name: 'Xbox', regionId: 'r-us' }, regions);
+    const uk = brandLabel({ id: 'b2', name: 'Xbox', regionId: 'r-uk' }, regions);
+    assert.notEqual(us, uk);
+  });
+
+  // Regions load separately, so the label must stay usable before they arrive
+  // rather than rendering "PlayStation — undefined".
+  it('falls back to the bare name when the region is not loaded yet', () => {
+    assert.equal(brandLabel({ id: 'b1', name: 'Steam', regionId: 'r-us' }, undefined), 'Steam');
+    assert.equal(brandLabel({ id: 'b1', name: 'Steam', regionId: 'r-zz' }, regions), 'Steam');
   });
 });
