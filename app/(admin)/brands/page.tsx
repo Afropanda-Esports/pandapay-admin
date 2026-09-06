@@ -4,7 +4,6 @@ import { useQuery } from '@tanstack/react-query';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
-import { CreateBrandDialog } from '@/components/features/brands/create-brand-dialog';
 import { DeleteCatalogRowDialog } from '@/components/features/catalog/delete-catalog-row-dialog';
 import { EmptyState } from '@/components/shared/empty-state';
 import { PageHeader } from '@/components/shared/page-header';
@@ -36,8 +35,7 @@ export default function BrandsPage() {
     <div>
       <PageHeader
         title="Brands"
-        description="Platforms customers can buy from, scoped to a region. Brands cannot be deleted once created."
-        actions={<CreateBrandDialog />}
+        description="Platforms customers can buy from, scoped to a region. New brands are added via deployment scripts so WhatsApp vocabulary can be updated alongside."
       />
 
       {isError ? (

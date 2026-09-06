@@ -11,29 +11,6 @@ import { toSelectItems } from './select-items.ts';
 
 const UUID = '49810d92-2103-48b5-9e08-5ee2d6e016c4';
 
-function configuredItemMaps(file: string): string[] {
-  const source = readFileSync(file, 'utf8');
-  const tree = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
-  const configured: string[] = [];
-
-  function visit(node: ts.Node): void {
-    if (ts.isJsxOpeningElement(node) && node.tagName.getText(tree) === 'Select') {
-      const items = node.attributes.properties.find(
-        (attribute): attribute is ts.JsxAttribute =>
-          ts.isJsxAttribute(attribute) && attribute.name.getText(tree) === 'items',
-      );
-      const expression = items?.initializer;
-      if (expression && ts.isJsxExpression(expression) && expression.expression) {
-        configured.push(expression.expression.getText(tree));
-      }
-    }
-    ts.forEachChild(node, visit);
-  }
-
-  visit(tree);
-  return configured;
-}
-
 function callPayloads(
   file: string,
   fn: string,
@@ -80,21 +57,6 @@ test('maps opaque ids to labels while keeping the id as the submitted value', ()
   assert.match(html, new RegExp(`value="${UUID}"`));
 });
 
-test('all UUID selects in the product dialog provide label maps', () => {
-  const configured = configuredItemMaps(
-    'components/features/products/create-product-dialog.tsx',
-  );
-
-  for (const expected of [
-    'regionSelectItems',
-    'categorySelectItems',
-    'brandSelectItems',
-    'lineSelectItems',
-  ]) {
-    assert.ok(configured.includes(expected), `missing items={${expected}}`);
-  }
-});
-
 /**
  * VOUCH-001: vouchers are product-agnostic (WA-052). The dialog must not quietly
  * regrow a product/category scope the backend ignores.
@@ -127,21 +89,6 @@ test('the voucher dialog submits value and currency', () => {
   assert.ok(!('discountValue' in payload), 'discountValue was removed by DISC-008');
   assert.ok(!('discountType' in payload), 'discountType was removed by DISC-008');
 });
-
-test('product mutations continue to submit ids rather than display labels', () => {
-  const payloads = callPayloads(
-    'components/features/products/create-product-dialog.tsx',
-    'createProduct',
-  );
-
-  assert.equal(payloads.length, 2);
-  for (const payload of payloads) {
-    assert.equal(payload.brandId, 'data.brandId');
-    assert.equal(payload.lineId, 'data.lineId');
-    assert.equal(payload.categoryId, 'data.categoryId');
-  }
-});
-
 
 /**
  * CAT-004 shipped DELETE, archive and unarchive for products and no admin app

@@ -7,7 +7,6 @@ import { useState } from 'react';
 
 import { getCategories } from '@/lib/api/categories';
 
-import { CreateProductDialog } from '@/components/features/products/create-product-dialog';
 import { EmptyState } from '@/components/shared/empty-state';
 import { PageHeader } from '@/components/shared/page-header';
 import { Badge } from '@/components/ui/badge';
@@ -222,8 +221,7 @@ export default function ProductsPage() {
     <div>
       <PageHeader
         title="Products"
-        description="Manage gift card and top-up SKUs."
-        actions={<CreateProductDialog />}
+        description="Gift card and top-up SKUs. New products are added via deployment scripts so WhatsApp vocabulary can be updated alongside."
       />
 
       <Tabs

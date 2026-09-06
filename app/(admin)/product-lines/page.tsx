@@ -4,7 +4,6 @@ import { useQuery } from '@tanstack/react-query';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
-import { CreateProductLineDialog } from '@/components/features/product-lines/create-product-line-dialog';
 import { DeleteCatalogRowDialog } from '@/components/features/catalog/delete-catalog-row-dialog';
 import { EmptyState } from '@/components/shared/empty-state';
 import { PageHeader } from '@/components/shared/page-header';
@@ -48,8 +47,7 @@ export default function ProductLinesPage() {
     <div>
       <PageHeader
         title="Product lines"
-        description="Groups of products under a brand, shown to customers in WhatsApp. Lines cannot be deleted once created."
-        actions={<CreateProductLineDialog />}
+        description="Groups of products under a brand, shown to customers in WhatsApp. New lines are added via deployment scripts so vocabulary can be updated alongside."
       />
 
       {isError ? (

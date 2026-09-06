@@ -3,7 +3,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 
-import { CreateCategoryDialog } from '@/components/features/categories/create-category-dialog';
 import { EditCategoryDialog } from '@/components/features/categories/edit-category-dialog';
 import { DeleteCatalogRowDialog } from '@/components/features/catalog/delete-catalog-row-dialog';
 import { EmptyState } from '@/components/shared/empty-state';
@@ -24,8 +23,7 @@ export default function CategoriesPage() {
     <div>
       <PageHeader
         title="Categories"
-        description="Manage product categories used across the platform."
-        actions={<CreateCategoryDialog />}
+        description="Product categories used across the platform. New categories are added via deployment scripts so WhatsApp vocabulary can be updated alongside."
       />
 
       {isError ? (
