@@ -5,12 +5,13 @@ import { AlertCircle, RefreshCw } from 'lucide-react';
 
 import { CreateCategoryDialog } from '@/components/features/categories/create-category-dialog';
 import { EditCategoryDialog } from '@/components/features/categories/edit-category-dialog';
+import { DeleteCatalogRowDialog } from '@/components/features/catalog/delete-catalog-row-dialog';
 import { EmptyState } from '@/components/shared/empty-state';
 import { PageHeader } from '@/components/shared/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getCategories } from '@/lib/api/categories';
+import { deleteCategory, getCategories, updateCategory } from '@/lib/api/categories';
 import { format, parseISO } from 'date-fns';
 
 export default function CategoriesPage() {
@@ -77,7 +78,23 @@ export default function CategoriesPage() {
                     {format(parseISO(cat.createdAt), 'PP')}
                   </td>
                   <td className="px-3 py-2 text-right">
-                    <EditCategoryDialog category={cat} />
+                    <div className="flex items-center justify-end gap-2">
+                      <EditCategoryDialog category={cat} />
+                      <DeleteCatalogRowDialog
+                        name={cat.name}
+                        noun="category"
+                        onDelete={() => deleteCategory(cat.id)}
+                        alternative={{
+                          label: 'Deactivate it instead',
+                          run: () =>
+                            updateCategory(cat.id, {
+                              name: cat.name,
+                              isActive: false,
+                            }),
+                        }}
+                        invalidateKeys={[['categories']]}
+                      />
+                    </div>
                   </td>
                 </tr>
               ))}

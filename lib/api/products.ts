@@ -40,6 +40,22 @@ export const getProductBrands = (regionId?: string) => {
 export const getAllowedBrandNames = () =>
   apiFetch<string[]>('/admin/product-brands/allowed-names');
 
+/** CAT-009: refused with a 409 when any product names the brand, or any line
+ *  hangs off it. Deactivating is the reversible alternative. */
+export const deleteProductBrand = (id: string) =>
+  apiFetch<{ deleted: true }>(`/admin/product-brands/${id}`, {
+    method: 'DELETE',
+  });
+
+export const updateProductBrand = (
+  id: string,
+  body: { name?: string; isActive?: boolean },
+) =>
+  apiFetch<ProductBrand>(`/admin/product-brands/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+
 export const createProductBrand = (body: { regionId: string; name: string }) =>
   apiFetch<ProductBrand>('/admin/product-brands', {
     method: 'POST',
@@ -55,6 +71,12 @@ export const createProductLine = (body: { brandId: string; name: string }) =>
   apiFetch<ProductLine>('/admin/product-lines', {
     method: 'POST',
     body: JSON.stringify(body),
+  });
+
+/** CAT-009: refused with a 409 when any product still uses the line. */
+export const deleteProductLine = (id: string) =>
+  apiFetch<{ deleted: true }>(`/admin/product-lines/${id}`, {
+    method: 'DELETE',
   });
 
 export const updateProductLine = (

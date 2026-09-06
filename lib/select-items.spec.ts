@@ -223,3 +223,47 @@ test('a refused delete offers archiving instead of failing silently', () => {
   assert.ok(source.includes('err.status === 409'), 'must detect the refusal');
   assert.ok(source.includes('archiveProduct'), 'must offer the working alternative');
 });
+
+
+/**
+ * CAT-009 shipped DELETE for categories, brands and product lines. CAT-004's
+ * product delete sat unreachable for a day because nothing called it; these
+ * assert the client wires all three so that does not repeat.
+ */
+test('the API client reaches every CAT-009 delete endpoint', () => {
+  const products = readFileSync('lib/api/products.ts', 'utf8');
+  const categories = readFileSync('lib/api/categories.ts', 'utf8');
+
+  assert.ok(
+    /deleteProductBrand[\s\S]{0,200}method:\s*'DELETE'/.test(products),
+    'no DELETE for brands',
+  );
+  assert.ok(
+    /deleteProductLine[\s\S]{0,200}method:\s*'DELETE'/.test(products),
+    'no DELETE for lines',
+  );
+  assert.ok(
+    /deleteCategory[\s\S]{0,200}method:\s*'DELETE'/.test(categories),
+    'no DELETE for categories',
+  );
+});
+
+/**
+ * A refused delete is the common case at every level, so the shared dialog has
+ * to read the 409 and offer the working alternative. The product dialog proved
+ * the shape in CAT-010-FE; these levels reuse it rather than growing four
+ * near-identical copies, the same consolidation the backend guard got.
+ */
+test('the shared delete dialog handles the refusal and offers an alternative', () => {
+  const source = readFileSync(
+    'components/features/catalog/delete-catalog-row-dialog.tsx',
+    'utf8',
+  );
+
+  assert.ok(source.includes('err.status === 409'), 'must detect the refusal');
+  assert.ok(source.includes('alternative'), 'must offer a way forward');
+  assert.ok(
+    /if \(!isSuperAdmin\) return null;/.test(source),
+    'delete is SUPER_ADMIN at every level',
+  );
+});

@@ -5,12 +5,18 @@ import { AlertCircle, RefreshCw } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
 import { CreateBrandDialog } from '@/components/features/brands/create-brand-dialog';
+import { DeleteCatalogRowDialog } from '@/components/features/catalog/delete-catalog-row-dialog';
 import { EmptyState } from '@/components/shared/empty-state';
 import { PageHeader } from '@/components/shared/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getProductBrands, getRegions } from '@/lib/api/products';
+import {
+  deleteProductBrand,
+  getProductBrands,
+  getRegions,
+  updateProductBrand,
+} from '@/lib/api/products';
 
 export default function BrandsPage() {
   const { data, isLoading, isError, refetch } = useQuery({
@@ -58,6 +64,7 @@ export default function BrandsPage() {
                 <th className="px-3 py-2 font-medium">Region</th>
                 <th className="px-3 py-2 font-medium">Status</th>
                 <th className="px-3 py-2 font-medium">Created</th>
+                <th className="px-3 py-2 font-medium text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -81,6 +88,19 @@ export default function BrandsPage() {
                   </td>
                   <td className="px-3 py-2 text-xs text-muted-foreground">
                     {format(parseISO(brand.createdAt), 'PP')}
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    <DeleteCatalogRowDialog
+                      name={brand.name}
+                      noun="brand"
+                      onDelete={() => deleteProductBrand(brand.id)}
+                      alternative={{
+                        label: 'Deactivate it instead',
+                        run: () =>
+                          updateProductBrand(brand.id, { isActive: false }),
+                      }}
+                      invalidateKeys={[['product-brands']]}
+                    />
                   </td>
                 </tr>
               ))}
