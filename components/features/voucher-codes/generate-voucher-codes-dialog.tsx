@@ -29,10 +29,12 @@ import {
 } from '@/components/ui/select';
 import { ApiError } from '@/lib/api/client';
 import { generateVoucherCodes } from '@/lib/api/voucher-codes';
-import { SUPPORTED_CURRENCIES } from '@/lib/money';
+import { VOUCHER_CURRENCIES } from '@/lib/money';
 import type { VoucherCode } from '@/lib/types';
 
-const CURRENCY_OPTIONS = SUPPORTED_CURRENCIES.map((value) => ({
+// GBP-003: vouchers are their own capability. GBP is a pricing currency, but a
+// GBP voucher cannot be issued (the backend refuses it), so it is not offered.
+const CURRENCY_OPTIONS = VOUCHER_CURRENCIES.map((value) => ({
   value,
   label: value,
 }));
@@ -41,7 +43,7 @@ const schema = z.object({
   count: z.coerce.number().int().min(1).max(500),
   // VOUCH-001: face value in the selected currency — not USD-only.
   value: z.coerce.number().min(0.01),
-  currency: z.enum(SUPPORTED_CURRENCIES),
+  currency: z.enum(VOUCHER_CURRENCIES),
   expiresInDays: z.coerce.number().int().min(1).max(90).optional(),
   recipientLabel: z.string().trim().max(120).optional(),
 });

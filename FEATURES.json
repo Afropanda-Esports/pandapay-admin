@@ -1,6 +1,6 @@
 {
   "project": "pandapay-admin",
-  "updated": "2026-09-06",
+  "updated": "2026-09-30",
   "legend": {
     "status": [
       "FAIL",
@@ -107,6 +107,14 @@
       "verify": "pnpm test:unit && npx tsc --noEmit && pnpm lint && API_URL=http://localhost:3000 pnpm build",
       "status": "PENDING_REVIEW",
       "notes": "Contract: skills/.harness/contracts/PRICE-004-FE.md — EXECUTED 2026-09-06 on feat/price-004-fe-product-markup. Companion to be#163; MUST ship together — the console sends pricingMode/manualPriceNgn, which the new DTO rejects under forbidNonWhitelisted, so pricing is unsettable if the backend lands alone. New lib/markup.ts guards the null-vs-zero distinction (blank = inherit global, 0 = sell at cost); markup input is type=text on purpose because a number input coerces blank to 0. Rate-change preview corrected: it listed every GLOBAL_FX product at usd × rate; now only products that follow the global markup, priced with the ₦50 round-up the backend uses, plus a count of products that override and will not move. formatPricingMode KEPT for orders.pricing_mode (legacy column, financial records are not rewritten) — renders '—' for new orders. Removed: baseCurrencyFor (CUR-001-FE's D1(a) mapping, obsolete now currency comes from the region), usdPriceHelp and createProduct's currency field (both described the create form CAT-011-FE removed). Q1 taken as (a): currency read from product.baseCurrency, the backend's derived mirror. Verify: 58 unit tests, tsc 0, lint 0 errors (2 warnings pre-existing), build 0. Mutations caught: empty parsed as 0, zero not treated as an override, preview rounding down, effectiveMarkupBps using || instead of ??. NOT covered: no component tests exist in this repo — success criteria 1-6 are human checks. Executor did not self-PASS."
+    },
+    {
+      "id": "GBP-003-FE",
+      "name": "GBP programme phase 3 (admin safety): render GBP products correctly; keep vouchers and dollar pricing controls away from GBP",
+      "priority": 1,
+      "verify": "pnpm test:unit && npx tsc --noEmit && pnpm lint && API_URL=http://localhost:3000 pnpm build",
+      "status": "PENDING_REVIEW",
+      "notes": "Contract: pandapay-be skills/.harness/contracts/GBP-003.md (one contract for both repos). EXECUTED 2026-09-30 on feat/gbp-3-enable-gbp-dark off main@8d85a21. Companion to pandapay-be GBP-003 — deploy this admin FIRST (or together): an older admin meeting a GBP product falls back to showing its naira snapshot and offers a $ pricing editor that would send priceUsd (refused for GBP). Changes: lib/money.ts SUPPORTED_CURRENCIES gains GBP (£) as a pricing/display currency; new explicit VOUCHER_CURRENCIES (NGN, USD) now drives the Generate voucher dialog so GBP never appears there; formatProductPrice renders baseAmount in baseCurrency (GBP 10.00 -> £10, never $10 or £23,100), USD falls back to priceUsd for a backend without baseAmount; canEditPricingHere (NGN, USD) makes the product pricing card read-only for GBP with an explanation (GBP-5 builds the real editor); the general-markup form counts GBP products that follow the general markup but cannot be previewed with the USD oracle (it would otherwise have said 'moves nothing'); types split pricing currency (Product/OrderProductRef.baseCurrency, + baseAmount) from voucher currency (VoucherCode, GenerateVoucherCodesInput); lib/api/products.ts gains baseAmount (additive). No new screens (rates screen GBP-5, create page GBP-6). Verify: test:unit 73 (baseline 58), tsc 0, lint 0 errors / 2 pre-existing warnings, build ok. Executor did not self-PASS."
     }
   ]
 }

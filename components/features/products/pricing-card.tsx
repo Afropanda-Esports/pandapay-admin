@@ -22,7 +22,11 @@ import {
 } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { usePermissions } from '@/hooks/use-permissions';
-import { formatMoney } from '@/lib/money';
+import {
+  canEditPricingHere,
+  formatMoney,
+  formatProductPrice,
+} from '@/lib/money';
 import type { ProductWithStats } from '@/lib/types';
 import {
   effectiveMarkupBps,
@@ -127,6 +131,15 @@ export function PricingCard({ product }: Readonly<PricingCardProps>) {
           rate?.oracleNgnPerUsd ?? null,
           effectiveMarkupBps(parsedMarkup.markupBps ?? null, globalMarkupBps),
         );
+
+  // GBP-003: this card edits a dollar face value (`priceUsd`, `$`, USD-oracle
+  // preview). A product in a currency it cannot edit correctly — GBP — is shown
+  // read-only instead, until the currency-aware editor ships (GBP-5).
+  if (!canEditPricingHere(product.baseCurrency)) {
+    return (
+      <ReadOnlyPricingCard product={product} globalMarkupBps={globalMarkupBps} />
+    );
+  }
 
   const savedMarkupInput =
     product.markupBps === null ? '' : String(product.markupBps);
@@ -266,6 +279,76 @@ export function PricingCard({ product }: Readonly<PricingCardProps>) {
             ) : null}
           </div>
         </FieldGroup>
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * GBP-003 — the pricing card for a product whose currency the editor above
+ * cannot handle (GBP). Shows what is stored, in the product's own currency, and
+ * offers no control that could send a dollar field or preview a dollar price.
+ */
+function ReadOnlyPricingCard({
+  product,
+  globalMarkupBps,
+}: Readonly<{ product: ProductWithStats; globalMarkupBps: number | null }>) {
+  const markup =
+    product.markupBps === null
+      ? globalMarkupBps === null
+        ? 'Follows the general markup'
+        : `Follows the general markup (${globalMarkupBps} bps)`
+      : `${product.markupBps} bps`;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Coins className="size-4" />
+          Pricing
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex items-baseline justify-between border-b border-border/60 pb-3">
+          <span className="text-xs uppercase tracking-wide text-muted-foreground">
+            Current price
+          </span>
+          <span className="font-heading text-2xl font-bold tabular-nums">
+            {formatMoney(product.snapshotNgnPrice, 'NGN')}
+          </span>
+        </div>
+        <div className="flex items-baseline justify-between border-b border-border/60 pb-3">
+          <span className="text-xs uppercase tracking-wide text-muted-foreground">
+            Currency
+          </span>
+          <span className="text-sm tabular-nums">
+            {product.baseCurrency}
+            <span className="ml-2 text-xs text-muted-foreground">
+              from its region
+            </span>
+          </span>
+        </div>
+        <div className="flex items-baseline justify-between border-b border-border/60 pb-3">
+          <span className="text-xs uppercase tracking-wide text-muted-foreground">
+            Face value
+          </span>
+          <span className="text-sm tabular-nums">
+            {formatProductPrice(product)}
+          </span>
+        </div>
+        <div className="flex items-baseline justify-between border-b border-border/60 pb-3">
+          <span className="text-xs uppercase tracking-wide text-muted-foreground">
+            Markup
+          </span>
+          <span className="text-sm tabular-nums">{markup}</span>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          {product.baseCurrency} pricing can&apos;t be edited on this screen yet.
+          The price is computed by the backend from the {product.baseCurrency}
+          /NGN rate; face value and markup are changed through the pricing API
+          by a Super Admin until the {product.baseCurrency} pricing screen
+          ships.
+        </p>
       </CardContent>
     </Card>
   );
