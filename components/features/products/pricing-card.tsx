@@ -344,10 +344,10 @@ function ReadOnlyPricingCard({
         </div>
         <p className="text-sm text-muted-foreground">
           {product.baseCurrency} pricing can&apos;t be edited on this screen yet.
-          The price is computed by the backend from the {product.baseCurrency}
-          /NGN rate; face value and markup are changed through the pricing API
-          by a Super Admin until the {product.baseCurrency} pricing screen
-          ships.
+          The price is computed by the backend from the{' '}
+          {`${product.baseCurrency}/NGN`} rate; face value and markup are
+          changed through the pricing API by a Super Admin until the{' '}
+          {product.baseCurrency} pricing screen ships.
         </p>
       </CardContent>
     </Card>

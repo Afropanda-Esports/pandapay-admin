@@ -7,7 +7,7 @@
  * is inactive), so the console must be able to render a GBP product. Being in
  * this list grants *display* only. What an operator may do in a currency is a
  * separate, explicit list — `VOUCHER_CURRENCIES` below, and the pricing-edit
- * capability in `lib/pricing-edit.ts`.
+ * capability (`canEditPricingHere`) further down this file.
  */
 export const SUPPORTED_CURRENCIES = ['NGN', 'USD', 'GBP'] as const;
 
