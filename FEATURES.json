@@ -1,6 +1,6 @@
 {
   "project": "pandapay-admin",
-  "updated": "2026-09-30",
+  "updated": "2026-10-01",
   "legend": {
     "status": [
       "FAIL",
@@ -115,6 +115,22 @@
       "verify": "pnpm test:unit && npx tsc --noEmit && pnpm lint && API_URL=http://localhost:3000 pnpm build",
       "status": "PENDING_REVIEW",
       "notes": "Contract: pandapay-be skills/.harness/contracts/GBP-003.md (one contract for both repos). EXECUTED 2026-09-30 on feat/gbp-3-enable-gbp-dark off main@8d85a21. Companion to pandapay-be GBP-003 — deploy this admin FIRST (or together): an older admin meeting a GBP product falls back to showing its naira snapshot and offers a $ pricing editor that would send priceUsd (refused for GBP). Changes: lib/money.ts SUPPORTED_CURRENCIES gains GBP (£) as a pricing/display currency; new explicit VOUCHER_CURRENCIES (NGN, USD) now drives the Generate voucher dialog so GBP never appears there; formatProductPrice renders baseAmount in baseCurrency (GBP 10.00 -> £10, never $10 or £23,100), USD falls back to priceUsd for a backend without baseAmount; canEditPricingHere (NGN, USD) makes the product pricing card read-only for GBP with an explanation (GBP-5 builds the real editor); the general-markup form counts GBP products that follow the general markup but cannot be previewed with the USD oracle (it would otherwise have said 'moves nothing'); types split pricing currency (Product/OrderProductRef.baseCurrency, + baseAmount) from voucher currency (VoucherCode, GenerateVoucherCodesInput); lib/api/products.ts gains baseAmount (additive). No new screens (rates screen GBP-5, create page GBP-6). Verify: test:unit 73 (baseline 58), tsc 0, lint 0 errors / 2 pre-existing warnings, build ok. Executor did not self-PASS."
+    },
+    {
+      "id": "GBP-005-FE",
+      "name": "GBP programme phase 5: admin currency rates, currency-correct pricing and order snapshots",
+      "priority": 1,
+      "verify": "pnpm test:unit && pnpm exec tsc --noEmit && pnpm lint && API_URL=http://localhost:3000 pnpm build",
+      "status": "PENDING_REVIEW",
+      "notes": "Contract: pandapay-be skills/.harness/contracts/GBP-005-006.md. EXECUTED 2026-10-01 on feat/gbp-admin-completion off main@95cb5dc, consolidated with GBP-006-FE. Pricing is now Currency rates: USD oracle and GBP manual cards with history, age/source, 3-day non-blocking staleness warning, affected-product counts and the backend 409 confirmation flow for >10% GBP changes. USD/GBP product pricing uses backend previews; NGN edits ngnPrice plus declared USD. General markup previews followers through per-product backend calls; no client float pricing. Order detail shows GBP-4 per-line snapshots with a labelled legacy fallback. allowImportingTsExtensions was added so node:test can load the shared .ts modules. Verify: 165/165 unit tests, tsc clean, lint 0 errors / 1 pre-existing warning, build green. Executor did not self-PASS."
+    },
+    {
+      "id": "GBP-006-FE",
+      "name": "GBP programme phase 6: Super Admin product creation workflow",
+      "priority": 1,
+      "verify": "pnpm test:unit && pnpm exec tsc --noEmit && pnpm lint && API_URL=http://localhost:3000 pnpm build",
+      "status": "PENDING_REVIEW",
+      "notes": "Contract: pandapay-be skills/.harness/contracts/GBP-005-006.md. EXECUTED 2026-10-01 on feat/gbp-admin-completion off main@95cb5dc in one consolidated admin delivery with GBP-005-FE. Super Admin-only /products/new derives currency from Region, includes inactive regions for staging, filters dependent hierarchy selects, requires name/SKU, preserves blank markup as null and explicit 0, waits for the backend preview, and defaults availability off. Product detail shows SKU, region and a readiness checklist. Verify: 165/165 unit tests, tsc clean, lint 0 errors / 1 pre-existing warning, build green. Executor did not self-PASS."
     }
   ]
 }

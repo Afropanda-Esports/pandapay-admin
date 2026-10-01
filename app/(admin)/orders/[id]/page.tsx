@@ -32,15 +32,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ApiError } from '@/lib/api/client';
 import { usePermissions } from '@/hooks/use-permissions';
 import { getOrder, resendOrder, fulfillOrder, refundOrder, retryOrder } from '@/lib/api/orders';
-import {
-  formatFxMarkupNgn,
-  formatMarkupBps,
-  formatOracleNgnPerUsd,
-  formatPriceUsd,
-  formatPricingMode,
-  formatRateSnapshot,
-} from '@/lib/fx-markup-display';
-import { formatMoney } from '@/lib/money';
+import { formatProductPrice } from '@/lib/money';
+import { orderPricingView } from '@/lib/order-pricing';
 import { formatOrderSource } from '@/lib/order-source';
 import type { OrderDetail, PaymentMode } from '@/lib/types';
 
@@ -220,27 +213,102 @@ function PaymentInfo({ order }: Readonly<{ order: OrderDetail }>) {
   );
 }
 
+/**
+ * GBP-005 — how this order was priced, from what was recorded at checkout
+ * (GBP-4 snapshots). Never recomputed from the product, today's rate or today's
+ * markup. Orders written before GBP-4 show their legacy fields, labelled.
+ */
 function PricingInfo({ order }: Readonly<{ order: OrderDetail }>) {
+  const view = orderPricingView(order);
+
+  if (view.kind === 'LEGACY') {
+    return (
+      <InfoCard title="Pricing (legacy order)">
+        <p className="mb-2 text-xs text-muted-foreground">
+          Placed before per-line pricing snapshots were recorded. These are the
+          fields stored at the time.
+        </p>
+        {view.rows.map((row) => (
+          <DetailRow key={row.label} label={row.label} value={row.value} />
+        ))}
+      </InfoCard>
+    );
+  }
+
   return (
-    <InfoCard title="Pricing">
-      {/* Only orders placed before PRICE-004 carry a pricing mode. Newer ones
-          render "—"; the markup and oracle rate below describe them fully. */}
-      <DetailRow
-        label="Pricing mode (legacy)"
-        value={formatPricingMode(order.pricingMode)}
-      />
-      <DetailRow label="Face value (USD)" value={formatPriceUsd(order.priceUsd)} />
-      <DetailRow label="Markup" value={formatMarkupBps(order.markupBps)} />
-      <DetailRow
-        label="Oracle NGN/USD"
-        value={formatOracleNgnPerUsd(order.oracleNgnPerUsd)}
-      />
-      <DetailRow
-        label="Rate snapshot"
-        value={formatRateSnapshot(order.rateSnapshot)}
-      />
-      <DetailRow label="FX markup" value={formatFxMarkupNgn(order.fxMarkupNgn)} />
-    </InfoCard>
+    <Card className="lg:col-span-2">
+      <CardHeader>
+        <CardTitle className="text-sm">
+          Pricing · {view.currency} · recorded at checkout
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {view.lines.length > 0 ? (
+          <div className="overflow-x-auto rounded-lg border border-border">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2 font-medium">Item</th>
+                  <th className="px-3 py-2 text-right font-medium">Face value</th>
+                  <th className="px-3 py-2 text-right font-medium">Rate</th>
+                  <th className="px-3 py-2 text-right font-medium">Markup</th>
+                  <th className="px-3 py-2 text-right font-medium">Voucher</th>
+                  <th className="px-3 py-2 text-right font-medium">NGN total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {view.lines.map((line) => (
+                  <tr key={line.key} className="border-t border-border/60">
+                    <td className="px-3 py-2">
+                      {line.item}
+                      {line.sku ? (
+                        <span className="ml-2 font-mono text-xs text-muted-foreground">
+                          {line.sku}
+                        </span>
+                      ) : null}
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums">
+                      {line.faceValue}
+                      {line.quantity > 1 ? ` × ${line.quantity}` : ''}
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums">{line.rate}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{line.markup}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{line.voucher}</td>
+                    <td className="px-3 py-2 text-right font-medium tabular-nums">
+                      {line.ngnTotal}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
+        <div className="grid grid-cols-1 gap-x-8 sm:grid-cols-2">
+          <div>
+            <DetailRow label="Face value total" value={view.summary.faceValueTotal} />
+            <DetailRow label="Voucher applied" value={view.summary.voucherApplied} />
+            <DetailRow label="Rate at checkout" value={view.summary.rate} />
+          </div>
+          <div>
+            <DetailRow label="FX margin realised" value={view.summary.fxMarginRealised} />
+            <DetailRow label="Charged" value={view.summary.charged} />
+          </div>
+        </div>
+        {view.legacy ? (
+          <div className="text-xs text-muted-foreground">
+            <p className="mb-1 uppercase tracking-wide">Legacy USD fields (still recorded)</p>
+            <DetailRow
+              label="General markup at checkout (legacy)"
+              value={view.legacy.generalMarkupAtCheckout}
+            />
+            <DetailRow
+              label="Oracle NGN/USD (legacy)"
+              value={view.legacy.oracleNgnPerUsd}
+            />
+          </div>
+        ) : null}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -306,13 +374,11 @@ function VoucherInfo({ order }: Readonly<{ order: OrderDetail }>) {
         }
       />
       {order.product?.snapshotNgnPrice && (
+        // The product as it is TODAY — not what this order was charged (see
+        // Pricing). GBP-safe: a GBP product shows pounds, never dollars.
         <DetailRow
-          label="Price"
-          value={
-            order.product.baseCurrency === 'USD' && order.product.priceUsd
-              ? formatMoney(order.product.priceUsd, 'USD')
-              : formatMoney(order.product.snapshotNgnPrice, 'NGN')
-          }
+          label="Current catalog price"
+          value={formatProductPrice(order.product)}
         />
       )}
       <DetailRow

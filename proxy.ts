@@ -19,7 +19,9 @@ const PROTECTED_PATHS = [
   '/change-password',
 ];
 
-const SUPER_ADMIN_ONLY_PATHS = ['/admins'];
+// GBP-006: product creation is Super Admin only (the backend's SuperAdminGuard
+// is the authority; this keeps an Admin off the page entirely).
+const SUPER_ADMIN_ONLY_PATHS = ['/admins', '/products/new'];
 
 export function proxy(req: NextRequest) {
   const token = req.cookies.get(ADMIN_TOKEN_COOKIE)?.value;

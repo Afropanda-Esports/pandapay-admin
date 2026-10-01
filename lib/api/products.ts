@@ -1,4 +1,5 @@
 import { apiFetch } from './client';
+import type { CreateProductBody } from '@/lib/product-create';
 import type {
   Product,
   ProductWithStats,
@@ -114,29 +115,14 @@ export const getProduct = (id: string) =>
   apiFetch<ProductWithStats>(`/admin/products/${id}`);
 
 /**
- * Unused since CAT-011-FE removed catalog creation from the console. Kept
- * against the real API shape rather than deleted: a dead client with a stale
- * signature is the kind of lie that gets copied when creation returns.
- *
- * PRICE-004: currency is not sent — it comes from the brand's region.
+ * GBP-006 — `POST /admin/products`, Super Admin only (the backend's
+ * SuperAdminGuard). The body comes from `buildCreateProductBody`: no currency
+ * (the region decides it), a required SKU, `baseAmount` for USD/GBP or the
+ * naira fields for NGN, `markupBps: null` to inherit, and `isAvailable`
+ * (the backend default is `false`). The response is the stored row — its
+ * `snapshotNgnPrice` is authoritative even if a rate moved since the preview.
  */
-export const createProduct = (body: {
-  brandId: string;
-  lineId: string;
-  name: string;
-  categoryId: string;
-  /**
-   * GBP-003: face value in the region's currency, as a decimal string. Required
-   * for GBP; for USD this or `priceUsd`; not for NGN.
-   */
-  baseAmount?: string;
-  /** USD: deprecated alias of `baseAmount`. NGN: declared value. GBP: refused. */
-  priceUsd?: number;
-  /** Margin over cost in basis points; omit to follow the global markup. */
-  markupBps?: number;
-  /** Only for a product in a naira-denominated region. */
-  ngnPrice?: number;
-}) =>
+export const createProduct = (body: CreateProductBody) =>
   apiFetch<Product>('/admin/products', {
     method: 'POST',
     body: JSON.stringify(body),

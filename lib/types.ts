@@ -213,7 +213,44 @@ export interface PaymentTimelineEntry {
   confirmedAt: string;
 }
 
-export interface OrderDetail extends Order {
+/**
+ * GBP-004 per-line pricing snapshot (`order_items`). With `quantity`, these
+ * alone reproduce `lineTotal`. All snapshot fields are null on a legacy line.
+ */
+export interface OrderItemDetail {
+  id: string;
+  productId: string;
+  nameSnapshot: string;
+  skuSnapshot: string | null;
+  /** The naira charged per unit, after the voucher. */
+  unitAmount: string;
+  quantity: number;
+  lineTotal: string;
+  baseCurrency: PricingCurrency | null;
+  /** One unit's face value before any voucher (the naira price for NGN). */
+  unitBaseAmount: string | null;
+  /** This line's share of the voucher, in `baseCurrency`. */
+  voucherBaseAllocated: string | null;
+  /** Raw NGN per unit the line was priced at. Null for NGN. */
+  ngnPerUnit: string | null;
+  /** The markup actually charged (product's own, else the general). Null for NGN. */
+  markupBpsApplied: number | null;
+}
+
+/**
+ * GBP-004 order-level pricing snapshot. NULL on every field means a legacy
+ * order (written before GBP-4, never backfilled).
+ */
+export interface OrderPricingSnapshot {
+  baseCurrency?: PricingCurrency | null;
+  baseAmountTotal?: string | null;
+  ngnPerUnit?: string | null;
+  fxRateId?: string | null;
+  voucherAppliedBase?: string | null;
+}
+
+export interface OrderDetail extends Order, OrderPricingSnapshot {
+  items?: OrderItemDetail[];
   voucherAssigned: boolean;
   voucherIsUsed: boolean;
   rateSnapshot?: string | null;
@@ -284,6 +321,9 @@ export interface ProductBrand {
   createdAt: string;
 }
 
+/** A brand as `GET /admin/products/:id` embeds it, with its region (GBP-006). */
+export type ProductBrandWithRegion = ProductBrand & { region?: Region };
+
 export interface ProductLine {
   id: string;
   brandId: string;
@@ -331,6 +371,11 @@ export interface Product {
   baseAmount?: string | null;
   snapshotNgnPrice: string;
   snapshotAt: string;
+  /** GBP-006: required for admin-created products; null on older ones. */
+  sku?: string | null;
+  /** Relations the detail endpoint loads (`GET /admin/products/:id`). */
+  brand?: ProductBrandWithRegion;
+  line?: ProductLine;
   /**
    * CAT-004: when the product was retired, or null if it is still on sale.
    * Deliberately separate from `isAvailable`, which means "out of stock for
@@ -357,6 +402,83 @@ export interface ExchangeRate {
 export interface ExchangeRateHistoryItem extends ExchangeRate {
   id: string;
   createdAt: string;
+}
+
+// ─── Currency rates (GBP-005) ─────────────────────────────────────────────────
+
+/** One stored raw rate (`GET /admin/pricing/rates…`). No markup. */
+export interface CurrencyRateView {
+  id: string;
+  currency: PricingCurrency;
+  /** Raw NGN per one unit of `currency`. Decimal string, 4 dp. */
+  ngnPerUnit: string;
+  effectiveFrom: string;
+  /** `ORACLE` (USD) or `MANUAL` (GBP). */
+  source: string;
+  setById: string | null;
+  note: string | null;
+  createdAt: string;
+}
+
+export type RateManagement = 'ORACLE' | 'MANUAL';
+
+export interface CurrencyRatesOverview {
+  /** The general markup every converted currency (USD, GBP) inherits. */
+  generalMarkupBps: number;
+  rates: Array<{
+    currency: PricingCurrency;
+    management: RateManagement;
+    current: CurrencyRateView | null;
+  }>;
+}
+
+export interface SetCurrencyRateInput {
+  /** NGN per one unit, decimal string, ≤ 4 dp. */
+  ngnPerUnit: string;
+  note?: string;
+  /** Required by the backend for a change of more than 10 % (DECISION R). */
+  confirmLargeChange?: boolean;
+}
+
+export interface SetCurrencyRateResult {
+  rate: CurrencyRateView;
+  previousNgnPerUnit: string | null;
+  changePercent: string | null;
+  affected: number;
+}
+
+/** `details` of a `409 LARGE_RATE_CHANGE`. */
+export interface LargeRateChangeDetails {
+  currency: string;
+  previousNgnPerUnit: string;
+  proposedNgnPerUnit: string;
+  /** Signed percent, 4 dp. */
+  changePercent: string;
+  direction: 'INCREASE' | 'DECREASE';
+  thresholdPercent: string;
+  previousEffectiveFrom: string;
+  requiresConfirmation: boolean;
+}
+
+/** `POST /admin/pricing/preview` — the authoritative naira price. */
+export interface PricePreviewRequest {
+  regionId?: string;
+  currency?: PricingCurrency;
+  baseAmount: string;
+  markupBps: number | null;
+}
+
+export interface PricePreview {
+  currency: PricingCurrency;
+  baseAmount: string;
+  /** The RAW rate, no markup. */
+  ngnPerUnit: string;
+  rateEffectiveFrom: string;
+  rateSource: string;
+  globalMarkupBps: number;
+  /** The markup actually applied: the product's own, or the general one. */
+  effectiveMarkupBps: number;
+  ngnPrice: string;
 }
 
 // ─── Audit ────────────────────────────────────────────────────────────────────
