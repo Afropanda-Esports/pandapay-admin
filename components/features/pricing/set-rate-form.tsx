@@ -11,6 +11,7 @@ import { ApiError } from '@/lib/api/client';
 import { setRate } from '@/lib/api/pricing';
 import { previewNgn } from '@/lib/markup';
 import { getProducts } from '@/lib/api/products';
+import { followsGlobalMarkupWithoutPreview } from '@/lib/money';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -139,6 +140,12 @@ export function SetRateForm({
   // Products with their own markup are unaffected by the global one, and the
   // admin needs telling — otherwise a global change that moves nothing reads
   // as a broken save.
+  // GBP-003: a GBP product that follows the general markup is repriced by the
+  // backend when it changes, from the GBP rate — this USD-oracle preview cannot
+  // price it, so it is counted and named instead of silently left out.
+  const unpreviewedCount = (products ?? []).filter(
+    followsGlobalMarkupWithoutPreview,
+  ).length;
   const overridingProductCount = (products ?? []).filter(
     (p) => p.markupBps !== null && p.priceUsd != null,
   ).length;
@@ -216,6 +223,7 @@ export function SetRateForm({
                 overallDelta={overallDelta}
                 hasGlobalFxProducts={hasGlobalFxProducts}
                 overridingProductCount={overridingProductCount}
+                unpreviewedCount={unpreviewedCount}
                 rows={previewRows}
               />
             )}
@@ -237,14 +245,18 @@ function RatePreview({
   overallDelta,
   hasGlobalFxProducts,
   overridingProductCount,
+  unpreviewedCount,
   rows,
 }: Readonly<{
   draftRate: number;
   overallDelta: { pct: number; direction: DeltaDirection } | null;
   hasGlobalFxProducts: boolean;
   overridingProductCount: number;
+  unpreviewedCount: number;
   rows: PreviewRow[];
 }>) {
+  const unpreviewedNotice = <UnpreviewedNotice count={unpreviewedCount} />;
+
   // PRICE-004: a product with its own markup ignores the global one. Without
   // saying so, a rate change that visibly moves nothing reads as a failed save.
   const overrideNotice =
@@ -257,10 +269,14 @@ function RatePreview({
     ) : null;
 
   if (!hasGlobalFxProducts) {
+    const noneMessage =
+      unpreviewedCount > 0
+        ? 'No dollar product follows the global markup.'
+        : 'No product follows the global markup, so changing it moves nothing today.';
     return (
       <div className="rounded-lg border border-dashed border-border bg-muted/30 p-3 text-xs text-muted-foreground">
-        No product follows the global markup, so changing it moves nothing
-        today.
+        {noneMessage}
+        {unpreviewedNotice}
         {overrideNotice}
       </div>
     );
@@ -314,8 +330,26 @@ function RatePreview({
           + {hidden} more product{hidden === 1 ? '' : 's'}
         </div>
       )}
+      {unpreviewedNotice}
       {overrideNotice}
     </div>
+  );
+}
+
+/**
+ * GBP-003 — products that follow the global markup but are priced from a rate
+ * other than the USD oracle (GBP). They move when the markup changes; this form
+ * cannot preview them, so it says they exist instead of omitting them.
+ */
+function UnpreviewedNotice({ count }: Readonly<{ count: number }>) {
+  if (count === 0) return null;
+  const one = count === 1;
+  return (
+    <p className="mt-2 text-xs text-muted-foreground">
+      {count} product{one ? '' : 's'} priced in another currency (e.g. GBP) also
+      follow{one ? 's' : ''} the global markup and will be repriced from{' '}
+      {one ? 'its' : 'their'} own rate — not previewed here.
+    </p>
   );
 }
 

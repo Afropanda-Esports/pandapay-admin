@@ -125,7 +125,13 @@ export const createProduct = (body: {
   lineId: string;
   name: string;
   categoryId: string;
-  priceUsd: number;
+  /**
+   * GBP-003: face value in the region's currency, as a decimal string. Required
+   * for GBP; for USD this or `priceUsd`; not for NGN.
+   */
+  baseAmount?: string;
+  /** USD: deprecated alias of `baseAmount`. NGN: declared value. GBP: refused. */
+  priceUsd?: number;
   /** Margin over cost in basis points; omit to follow the global markup. */
   markupBps?: number;
   /** Only for a product in a naira-denominated region. */
@@ -155,6 +161,9 @@ export const updateProduct = (
 export const updateProductPricing = (
   id: string,
   body: {
+    /** GBP-003: face value in the product's currency (decimal string). */
+    baseAmount?: string;
+    /** USD alias of `baseAmount`; refused by the backend for GBP. */
     priceUsd?: number;
     markupBps?: number | null;
     ngnPrice?: number;

@@ -1,3 +1,5 @@
+import type { PricingCurrency, VoucherCurrency } from '@/lib/money';
+
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
 export type OrderStatus =
@@ -154,9 +156,11 @@ export interface OrderProductRef {
   categoryId: string;
   category?: Category;
   snapshotNgnPrice: string;
-  /** CUR-001: renamed from `currency`. */
-  baseCurrency: 'NGN' | 'USD';
+  /** CUR-001: renamed from `currency`. GBP-003: a pricing currency, GBP included. */
+  baseCurrency: PricingCurrency;
   priceUsd?: string | null;
+  /** GBP-001/003: face value in `baseCurrency` (null for naira products). */
+  baseAmount?: string | null;
   isAvailable: boolean;
 }
 
@@ -305,7 +309,7 @@ export interface Product {
    * What this product is priced in. PRICE-004 made the **region** the source of
    * truth; this is a mirror the backend maintains, and it is not settable here.
    */
-  baseCurrency: 'NGN' | 'USD';
+  baseCurrency: PricingCurrency;
   isAvailable: boolean;
   /**
    * PRICE-004: margin over cost, in basis points. `null` means the product
@@ -313,7 +317,18 @@ export interface Product {
    * prices — see `lib/markup.ts`.
    */
   markupBps: number | null;
+  /**
+   * Legacy dollar field: the USD face value (mirror of `baseAmount`), a naira
+   * product's declared value, and always null for GBP (GBP-003). Read the face
+   * value from `baseAmount`.
+   */
   priceUsd: string | null;
+  /**
+   * GBP-001/003: face value in `baseCurrency` — `"10.00"` is £10 for a GBP
+   * product. Null for a naira product, whose price is `snapshotNgnPrice`.
+   * Optional because a backend older than GBP-001 does not send it.
+   */
+  baseAmount?: string | null;
   snapshotNgnPrice: string;
   snapshotAt: string;
   /**
@@ -409,8 +424,8 @@ export interface VoucherCode {
   code: string;
   /** Face value in `currency` — DECIMAL string, never a float. */
   value: string;
-  /** Currency the voucher is denominated in (NGN | USD). */
-  currency: 'NGN' | 'USD';
+  /** Currency the voucher is denominated in — a voucher currency, never GBP (GBP-003). */
+  currency: VoucherCurrency;
   recipientLabel: string | null;
   expiresAt: string;
   isUsed: boolean;
@@ -427,7 +442,7 @@ export interface GenerateVoucherCodesInput {
   count: number; // 1–500
   /** Face value in `currency`. */
   value: number;
-  currency: 'NGN' | 'USD';
+  currency: VoucherCurrency;
   expiresInDays?: number; // 1–90
   recipientLabel?: string;
 }
