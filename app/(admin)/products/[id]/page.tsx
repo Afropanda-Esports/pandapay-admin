@@ -5,6 +5,7 @@ import {
   AlertCircle,
   ArrowLeft,
   CheckCircle2,
+  Circle,
   PauseCircle,
   RefreshCw,
 } from 'lucide-react';
@@ -30,6 +31,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ApiError } from '@/lib/api/client';
 import { getProduct, updateProduct } from '@/lib/api/products';
 import { formatProductPrice } from '@/lib/money';
+import { readinessChecklist } from '@/lib/product-create';
 import type { ProductWithStats } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
@@ -97,6 +99,24 @@ function DetailsCard({
           <DetailRow
             label="Category"
             value={product.category?.name || 'Unknown'}
+          />
+          <DetailRow
+            label="SKU"
+            value={
+              product.sku ? (
+                <span className="font-mono text-xs">{product.sku}</span>
+              ) : (
+                '—'
+              )
+            }
+          />
+          <DetailRow
+            label="Region"
+            value={
+              product.brand?.region
+                ? `${product.brand.region.name}${product.brand.region.isActive ? '' : ' (inactive)'}`
+                : '—'
+            }
           />
           <DetailRow label="Currency" value={product.baseCurrency} />
           <DetailRow
@@ -183,6 +203,51 @@ function VoucherStatsCard({
             />
           </div>
         </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * GBP-006 — where this product is on the way to customers:
+ * create → unavailable → review price → upload stock → mark available → region
+ * active → visible. Operator feedback only; it changes nothing.
+ */
+function ReadinessCard({ product }: Readonly<{ product: ProductWithStats }>) {
+  const { items, customerVisible } = readinessChecklist({
+    snapshotNgnPrice: product.snapshotNgnPrice,
+    sku: product.sku,
+    isAvailable: product.isAvailable,
+    archivedAt: product.archivedAt,
+    voucherStats: product.voucherStats,
+    regionActive: product.brand?.region ? product.brand.region.isActive : null,
+  });
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Readiness</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        <ul className="space-y-1.5 text-sm">
+          {items.map((item) => (
+            <li key={item.key} className="flex items-center justify-between gap-4">
+              <span className="flex items-center gap-2">
+                {item.ok ? (
+                  <CheckCircle2 className="size-4 text-success-600" />
+                ) : (
+                  <Circle className="size-4 text-muted-foreground" />
+                )}
+                {item.label}
+              </span>
+              <span className="tabular-nums text-muted-foreground">{item.value}</span>
+            </li>
+          ))}
+        </ul>
+        <p className="text-xs text-muted-foreground">
+          {customerVisible
+            ? 'Customers can see and buy this product.'
+            : 'Not visible to customers yet.'}
+        </p>
       </CardContent>
     </Card>
   );
@@ -317,6 +382,7 @@ export default function ProductDetailPage({
           product={product}
         />
         <VoucherStatsCard product={product} />
+        <ReadinessCard product={product} />
       </div>
     </div>
   );

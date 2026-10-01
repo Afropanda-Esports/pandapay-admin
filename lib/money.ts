@@ -144,48 +144,73 @@ function nonBlank(value: string | null | undefined): string | null {
   return value == null || value.trim() === '' ? null : value;
 }
 
-// ─── Pricing-edit capability (GBP-003) ───────────────────────────────────────
+// ─── Rates and inputs (GBP-005) ──────────────────────────────────────────────
 
-/**
- * What the console's EXISTING pricing controls can safely do — GBP-003.
- *
- * Both controls were built for dollars. The product pricing card edits the face
- * value as `priceUsd` behind a `$` prefix and previews with the USD oracle; the
- * general-markup form previews every product with the USD oracle. For a GBP
- * product that would send a field the backend refuses, show the wrong symbol and
- * preview the wrong price. Until GBP-5 builds the currency-aware versions, GBP
- * pricing is read-only here and changed through the API by a Super Admin.
- *
- * An explicit list, like the backend's capabilities: a newly enabled currency is
- * read-only here until someone decides otherwise.
- */
-export const PRICING_CARD_EDIT_CURRENCIES = ['NGN', 'USD'] as const;
+export function currencySymbol(currency: SupportedCurrency): string {
+  return SYMBOLS[currency];
+}
 
-export function canEditPricingHere(currency: string): boolean {
-  return (PRICING_CARD_EDIT_CURRENCIES as readonly string[]).includes(currency);
+/** Group an integer string's thousands: `2100` → `2,100`. */
+function groupThousands(whole: string): string {
+  return whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }
 
 /**
- * Currencies the general-markup form's USD-oracle preview can price. Mirrors the
- * backend's `ORACLE_CURRENCIES`.
+ * A raw rate as "₦ per one unit": `2100.0000` → `₦2,100.00 / £1`. Read from the
+ * backend's decimal string — at least 2 and at most 4 decimals, trailing zeros
+ * beyond the second trimmed — never through a float.
  */
-const ORACLE_PREVIEW_CURRENCIES = ['USD'] as const;
+export function formatRatePerUnit(
+  ngnPerUnit: string,
+  currency: SupportedCurrency,
+): string {
+  const match = /^(\d+)(?:\.(\d+))?$/.exec(ngnPerUnit.trim());
+  if (!match) throw new Error(`Invalid rate: ${ngnPerUnit}`);
+  const fraction = (match[2] ?? '').slice(0, 4).replace(/0+$/, '').padEnd(2, '0');
+  return `₦${groupThousands(match[1]!)}.${fraction} / ${SYMBOLS[currency]}1`;
+}
+
+/** A face value with exactly two decimals: `10` → `£10.00`. */
+export function formatFaceValue(
+  amount: string,
+  currency: SupportedCurrency,
+): string {
+  const { whole, fraction } = toFixed2Parts(amount);
+  return `${SYMBOLS[currency]}${groupThousands(whole)}.${fraction}`;
+}
 
 /**
- * A product that WILL move when the general markup changes (it is converted and
- * inherits the general markup) but that the form cannot preview, because its
- * rate is not the USD oracle — a GBP product. The form must say these exist
- * rather than leave them out silently.
+ * The backend's face-value rule (`baseAmount` on create, edit and preview):
+ * positive, at most 2 decimals, at most 10 integer digits.
  */
-export function followsGlobalMarkupWithoutPreview(product: {
-  baseCurrency: string;
-  markupBps: number | null;
-}): boolean {
-  return (
-    product.markupBps === null &&
-    isConvertedCurrency(product.baseCurrency) &&
-    !(ORACLE_PREVIEW_CURRENCIES as readonly string[]).includes(
-      product.baseCurrency,
-    )
-  );
+const FACE_VALUE_PATTERN = /^(?!0+(\.0+)?$)\d{1,10}(\.\d{1,2})?$/;
+
+export function faceValueIssue(raw: string): string | null {
+  const value = raw.trim();
+  if (value === '') return 'Enter the face value';
+  if (!FACE_VALUE_PATTERN.test(value)) {
+    return 'Enter a positive amount with at most 2 decimal places';
+  }
+  return null;
+}
+
+/** A naira price as the backend takes it: at least ₦1, at most 2 decimals. */
+export function ngnPriceIssue(raw: string): string | null {
+  const value = raw.trim();
+  if (value === '') return 'Enter the naira price';
+  if (!/^\d{1,10}(\.\d{1,2})?$/.test(value)) {
+    return 'Enter an amount with at most 2 decimal places';
+  }
+  if (/^0*(\.\d*)?$/.test(value)) return 'The naira price must be at least ₦1';
+  return null;
+}
+
+/** A naira product's declared dollar value: at least $0.01, at most 2 decimals. */
+export function declaredUsdIssue(raw: string): string | null {
+  const value = raw.trim();
+  if (value === '') return 'Enter the declared dollar value';
+  if (!FACE_VALUE_PATTERN.test(value)) {
+    return 'Enter a positive amount with at most 2 decimal places';
+  }
+  return null;
 }

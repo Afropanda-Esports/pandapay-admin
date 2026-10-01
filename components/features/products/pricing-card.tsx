@@ -1,19 +1,12 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Coins } from 'lucide-react';
+import { AlertTriangle, Coins } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
-import { getCurrentRate } from '@/lib/api/pricing';
-import { updateProductPricing } from '@/lib/api/products';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Field,
   FieldError,
@@ -22,131 +15,55 @@ import {
 } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { usePermissions } from '@/hooks/use-permissions';
+import { usePricePreview } from '@/hooks/use-price-preview';
+import { ApiError } from '@/lib/api/client';
+import { getCurrencyRates } from '@/lib/api/pricing';
+import { updateProductPricing } from '@/lib/api/products';
+import { formatBpsAsPercent, markupGuidance, parseMarkupInput } from '@/lib/markup';
 import {
-  canEditPricingHere,
+  currencySymbol,
+  declaredUsdIssue,
+  faceValueIssue,
   formatMoney,
   formatProductPrice,
+  ngnPriceIssue,
 } from '@/lib/money';
-import type { ProductWithStats } from '@/lib/types';
 import {
-  effectiveMarkupBps,
-  parseMarkupInput,
-  previewNgn,
-} from '@/lib/markup';
+  buildPricingPatch,
+  describePreview,
+  previewErrorMessage,
+  previewRequestFor,
+  pricingEditKind,
+  saveBlockReason,
+} from '@/lib/pricing-edit';
+import type { ProductWithStats } from '@/lib/types';
 
 interface PricingCardProps {
   product: ProductWithStats;
 }
 
 /**
- * The field means three different things, and the difference is money:
- * blank follows the global markup, 0 sells at cost, anything else is this
- * product's own margin — and once it has one, changing the global will not
- * move it.
+ * GBP-005 — a product's price, in its own currency.
+ *
+ *   USD, GBP  face value + markup. The selling price shown is the backend's
+ *             (`POST /admin/pricing/preview`), the same function that saves and
+ *             charges it; Save waits for it. A GBP product never shows dollars.
+ *   NGN       the naira price itself, plus its declared dollar value.
+ *
+ * Editing is Super Admin (`products:pricing`); everyone else sees it read-only.
+ * The parent remounts this card (a `key`) when the saved values change.
  */
-function markupHelp(
-  parsed: ReturnType<typeof parseMarkupInput>,
-  globalMarkupBps: number | null,
-): string {
-  if (parsed.error) return 'Basis points over cost — 1350 is 13.5%.';
-  const bps = parsed.markupBps ?? null;
-  if (bps === null) {
-    return globalMarkupBps === null
-      ? 'Blank — follows the global markup, which is not set yet.'
-      : `Blank — follows the global markup (${globalMarkupBps} bps). Changing the global will move this product.`;
-  }
-  if (bps === 0) {
-    return 'Zero margin — this product sells at cost, and ignores the global markup.';
-  }
-  return `${(bps / 100).toFixed(2)}% over cost. This overrides the global markup, so changing the global will not move this product.`;
-}
-
 export function PricingCard({ product }: Readonly<PricingCardProps>) {
-  const queryClient = useQueryClient();
   const { can } = usePermissions();
   const canEditPricing = can('products:pricing');
+  const kind = pricingEditKind(product.baseCurrency);
 
-  // Local form state — initialised from the product, kept in sync if it reloads.
-  // PRICE-004: the markup field is a string, not a number, because an empty
-  // field and a typed 0 mean different things and a numeric state would lose
-  // the distinction before `parseMarkupInput` ever sees it.
-  const [priceUsd, setPriceUsd] = useState<string>(product.priceUsd ?? '');
-  const [markupInput, setMarkupInput] = useState<string>(
-    product.markupBps === null ? '' : String(product.markupBps),
-  );
-  const [error, setError] = useState<string | null>(null);
-
-  // Form state is initialised from props once on mount. Parent passes a key
-  // so the card remounts (resetting state) when the saved values change —
-  // matches React 19's "don't sync state in effects" rule.
-
-  const { data: rate } = useQuery({
-    queryKey: ['pricing-rate'],
-    queryFn: getCurrentRate,
+  const { data: rates } = useQuery({
+    queryKey: ['currency-rates'],
+    queryFn: getCurrencyRates,
     staleTime: 60_000,
   });
-
-  const mutation = useMutation({
-    mutationFn: () => {
-      const usd = Number.parseFloat(priceUsd);
-      if (!Number.isFinite(usd) || usd <= 0) {
-        throw new Error('Enter a USD face value greater than 0');
-      }
-      const parsed = parseMarkupInput(markupInput);
-      if (parsed.error) throw new Error(parsed.error);
-
-      // `markupBps: null` is sent deliberately — it clears the product's own
-      // markup so it follows the global one again. Omitting the field would
-      // leave the existing markup in place, which is a different request.
-      return updateProductPricing(product.id, {
-        priceUsd: usd,
-        markupBps: parsed.markupBps ?? null,
-      });
-    },
-    onSuccess: () => {
-      toast.success('Pricing updated');
-      setError(null);
-      queryClient.invalidateQueries({ queryKey: ['product', product.id] });
-      queryClient.invalidateQueries({ queryKey: ['products'] });
-    },
-    onError: (err) => {
-      const message =
-        err instanceof Error ? err.message : 'Failed to update pricing';
-      setError(message);
-      toast.error(message);
-    },
-  });
-
-  const parsedMarkup = parseMarkupInput(markupInput);
-  const globalMarkupBps = rate?.markupBps ?? null;
-
-  // Live preview of what the backend will compute. Uses the ORACLE rate, not
-  // the selling rate: the selling rate already carries the global markup, and
-  // multiplying by it would compound the two.
-  const preview =
-    parsedMarkup.error !== undefined || globalMarkupBps === null
-      ? null
-      : previewNgn(
-          priceUsd,
-          rate?.oracleNgnPerUsd ?? null,
-          effectiveMarkupBps(parsedMarkup.markupBps ?? null, globalMarkupBps),
-        );
-
-  // GBP-003: this card edits a dollar face value (`priceUsd`, `$`, USD-oracle
-  // preview). A product in a currency it cannot edit correctly — GBP — is shown
-  // read-only instead, until the currency-aware editor ships (GBP-5).
-  if (!canEditPricingHere(product.baseCurrency)) {
-    return (
-      <ReadOnlyPricingCard product={product} globalMarkupBps={globalMarkupBps} />
-    );
-  }
-
-  const savedMarkupInput =
-    product.markupBps === null ? '' : String(product.markupBps);
-
-  // True iff the form values differ from what's saved.
-  const isDirty =
-    priceUsd !== (product.priceUsd ?? '') || markupInput !== savedMarkupInput;
+  const generalMarkupBps = rates?.generalMarkupBps ?? null;
 
   return (
     <Card>
@@ -163,193 +80,376 @@ export function PricingCard({ product }: Readonly<PricingCardProps>) {
             and toggle availability.
           </p>
         ) : null}
-        <div className="flex items-baseline justify-between border-b border-border/60 pb-3">
-          <span className="text-xs uppercase tracking-wide text-muted-foreground">
-            Current price
-          </span>
+        <Row label="Current price">
           <span className="font-heading text-2xl font-bold tabular-nums">
             {formatMoney(product.snapshotNgnPrice, 'NGN')}
           </span>
-        </div>
-
-        <div className="flex items-baseline justify-between border-b border-border/60 pb-3">
-          <span className="text-xs uppercase tracking-wide text-muted-foreground">
-            Currency
-          </span>
+        </Row>
+        <Row label="Currency">
           <span className="text-sm tabular-nums">
             {product.baseCurrency}
             <span className="ml-2 text-xs text-muted-foreground">
               from its region
             </span>
           </span>
-        </div>
+        </Row>
 
-        <FieldGroup>
-          <Field>
-            <FieldLabel htmlFor="price-usd">Face value</FieldLabel>
-            <div className="relative">
-              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
-                $
-              </span>
-              <Input
-                id="price-usd"
-                type="number"
-                inputMode="decimal"
-                step="0.01"
-                min="0.01"
-                placeholder="10.00"
-                value={priceUsd}
-                onChange={(e) => {
-                  setPriceUsd(e.target.value);
-                  setError(null);
-                }}
-                disabled={mutation.isPending || !canEditPricing}
-                className="pl-7"
-              />
-            </div>
-            <p className="text-xs text-muted-foreground">
-              What the card is worth. The naira price is derived from this.
-            </p>
-          </Field>
-
-          <Field>
-            <FieldLabel htmlFor="markup-bps">Markup</FieldLabel>
-            <div className="relative">
-              <Input
-                id="markup-bps"
-                // Deliberately `text`, not `number`: a number input hands back
-                // an empty string for "-" and other partial entries, and the
-                // difference between blank and 0 is the whole point here.
-                type="text"
-                inputMode="numeric"
-                placeholder={
-                  globalMarkupBps === null
-                    ? 'Global markup not set'
-                    : `${globalMarkupBps} (global)`
-                }
-                value={markupInput}
-                onChange={(e) => {
-                  setMarkupInput(e.target.value);
-                  setError(null);
-                }}
-                disabled={mutation.isPending || !canEditPricing}
-                className="pr-12"
-              />
-              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
-                bps
-              </span>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {markupHelp(parsedMarkup, globalMarkupBps)}
-            </p>
-            {parsedMarkup.error ? (
-              <FieldError className="text-error-700">
-                {parsedMarkup.error}
-              </FieldError>
-            ) : null}
-          </Field>
-
-          {error && (
-            <FieldError className="text-error-700">{error}</FieldError>
-          )}
-
-          <div className="flex items-center justify-between gap-3 pt-1">
-            <div className="text-xs text-muted-foreground">
-              {preview === null ? (
-                globalMarkupBps === null
-                  ? 'No FX rate set — set one on the Pricing page first.'
-                  : 'Enter a face value to preview'
-              ) : (
-                <>
-                  Will save as{' '}
-                  <span className="font-mono text-sm text-foreground">
-                    {formatMoney(preview, 'NGN')}
-                  </span>
-                </>
-              )}
-            </div>
-            {canEditPricing ? (
-              <Button
-                type="button"
-                onClick={() => mutation.mutate()}
-                disabled={mutation.isPending || !isDirty || preview === null}
-              >
-                {mutation.isPending ? 'Saving…' : 'Save pricing'}
-              </Button>
-            ) : null}
-          </div>
-        </FieldGroup>
+        {kind === 'FACE_VALUE' ? (
+          <FaceValueEditor
+            product={product}
+            generalMarkupBps={generalMarkupBps}
+            canEdit={canEditPricing}
+          />
+        ) : (
+          <NairaPriceEditor product={product} canEdit={canEditPricing} />
+        )}
       </CardContent>
     </Card>
   );
 }
 
-/**
- * GBP-003 — the pricing card for a product whose currency the editor above
- * cannot handle (GBP). Shows what is stored, in the product's own currency, and
- * offers no control that could send a dollar field or preview a dollar price.
- */
-function ReadOnlyPricingCard({
+function Row({
+  label,
+  children,
+}: Readonly<{ label: string; children: React.ReactNode }>) {
+  return (
+    <div className="flex items-baseline justify-between gap-4 border-b border-border/60 pb-3">
+      <span className="text-xs uppercase tracking-wide text-muted-foreground">
+        {label}
+      </span>
+      {children}
+    </div>
+  );
+}
+
+function useSavePricing(productId: string, onError: (message: string) => void) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (patch: Parameters<typeof updateProductPricing>[1]) =>
+      updateProductPricing(productId, patch),
+    onSuccess: (saved) => {
+      // The saved row is the truth — if a rate moved since the preview, this
+      // is the price that was actually stored.
+      toast.success(
+        `Pricing saved — ${formatMoney(saved.snapshotNgnPrice, 'NGN')}`,
+      );
+      void queryClient.invalidateQueries({ queryKey: ['product', productId] });
+      void queryClient.invalidateQueries({ queryKey: ['products'] });
+    },
+    onError: (err) => {
+      const message =
+        err instanceof ApiError || err instanceof Error
+          ? err.message
+          : 'Failed to update pricing';
+      onError(message);
+      toast.error(message);
+    },
+  });
+}
+
+function FaceValueEditor({
   product,
-  globalMarkupBps,
-}: Readonly<{ product: ProductWithStats; globalMarkupBps: number | null }>) {
-  const markup =
-    product.markupBps === null
-      ? globalMarkupBps === null
-        ? 'Follows the general markup'
-        : `Follows the general markup (${globalMarkupBps} bps)`
-      : `${product.markupBps} bps`;
+  generalMarkupBps,
+  canEdit,
+}: Readonly<{
+  product: ProductWithStats;
+  generalMarkupBps: number | null;
+  canEdit: boolean;
+}>) {
+  const currency = product.baseCurrency;
+  const savedFace =
+    product.baseAmount ?? (currency === 'USD' ? (product.priceUsd ?? '') : '');
+  const savedMarkup = product.markupBps === null ? '' : String(product.markupBps);
+
+  // Strings, not numbers: blank markup (inherit) and 0 (at cost) differ, and a
+  // numeric state would lose that before `parseMarkupInput` sees it.
+  const [faceValue, setFaceValue] = useState(savedFace);
+  const [markup, setMarkup] = useState(savedMarkup);
+  const [error, setError] = useState<string | null>(null);
+  const mutation = useSavePricing(product.id, setError);
+
+  const parsedMarkup = parseMarkupInput(markup);
+  const guidance = markupGuidance(currency, parsedMarkup, generalMarkupBps);
+  const faceError = faceValueIssue(faceValue);
+  const isDirty = faceValue !== savedFace || markup !== savedMarkup;
+
+  const preview = usePricePreview(
+    canEdit
+      ? previewRequestFor({ currency, faceValue, markup })
+      : { blocked: 'read-only' },
+  );
+  const display = preview.preview
+    ? describePreview(preview.preview, parsedMarkup.markupBps ?? null)
+    : null;
+  const blockReason = saveBlockReason({
+    kind: 'FACE_VALUE',
+    isDirty,
+    inputError: faceError ?? parsedMarkup.error ?? null,
+    preview: preview.state,
+  });
+
+  if (!canEdit) {
+    return (
+      <>
+        <Row label="Face value">
+          <span className="text-sm tabular-nums">{formatProductPrice(product)}</span>
+        </Row>
+        <Row label="Markup">
+          <span className="text-sm tabular-nums">
+            {product.markupBps === null
+              ? generalMarkupBps === null
+                ? 'Follows the general markup'
+                : `Follows the general markup (${formatBpsAsPercent(generalMarkupBps)})`
+              : formatBpsAsPercent(product.markupBps)}
+          </span>
+        </Row>
+      </>
+    );
+  }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <Coins className="size-4" />
-          Pricing
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex items-baseline justify-between border-b border-border/60 pb-3">
-          <span className="text-xs uppercase tracking-wide text-muted-foreground">
-            Current price
+    <FieldGroup>
+      <Field>
+        <FieldLabel htmlFor="face-value">Face value</FieldLabel>
+        <div className="relative">
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+            {currencySymbol(currency)}
           </span>
-          <span className="font-heading text-2xl font-bold tabular-nums">
-            {formatMoney(product.snapshotNgnPrice, 'NGN')}
-          </span>
+          <Input
+            id="face-value"
+            // Text, not number: the value is sent as the exact decimal string.
+            type="text"
+            inputMode="decimal"
+            placeholder="10.00"
+            value={faceValue}
+            onChange={(e) => {
+              setFaceValue(e.target.value);
+              setError(null);
+            }}
+            disabled={mutation.isPending}
+            className="pl-7"
+          />
         </div>
-        <div className="flex items-baseline justify-between border-b border-border/60 pb-3">
-          <span className="text-xs uppercase tracking-wide text-muted-foreground">
-            Currency
-          </span>
-          <span className="text-sm tabular-nums">
-            {product.baseCurrency}
-            <span className="ml-2 text-xs text-muted-foreground">
-              from its region
-            </span>
-          </span>
-        </div>
-        <div className="flex items-baseline justify-between border-b border-border/60 pb-3">
-          <span className="text-xs uppercase tracking-wide text-muted-foreground">
-            Face value
-          </span>
-          <span className="text-sm tabular-nums">
-            {formatProductPrice(product)}
-          </span>
-        </div>
-        <div className="flex items-baseline justify-between border-b border-border/60 pb-3">
-          <span className="text-xs uppercase tracking-wide text-muted-foreground">
-            Markup
-          </span>
-          <span className="text-sm tabular-nums">{markup}</span>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          {product.baseCurrency} pricing can&apos;t be edited on this screen yet.
-          The price is computed by the backend from the{' '}
-          {`${product.baseCurrency}/NGN`} rate; face value and markup are
-          changed through the pricing API by a Super Admin until the{' '}
-          {product.baseCurrency} pricing screen ships.
+        <p className="text-xs text-muted-foreground">
+          What the card is worth, in {currency}. The naira price is derived from
+          this by the backend.
         </p>
-      </CardContent>
-    </Card>
+        {faceValue !== '' && faceError ? (
+          <FieldError className="text-error-700">{faceError}</FieldError>
+        ) : null}
+      </Field>
+
+      <Field>
+        <FieldLabel htmlFor="markup-bps">Markup</FieldLabel>
+        <div className="relative">
+          <Input
+            id="markup-bps"
+            // Deliberately `text`: blank and 0 must stay different.
+            type="text"
+            inputMode="numeric"
+            placeholder={
+              generalMarkupBps === null
+                ? 'Blank = general markup'
+                : `${generalMarkupBps} (general)`
+            }
+            value={markup}
+            onChange={(e) => {
+              setMarkup(e.target.value);
+              setError(null);
+            }}
+            disabled={mutation.isPending}
+            className="pr-12"
+          />
+          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+            bps
+          </span>
+        </div>
+        <p className="text-xs text-muted-foreground">{guidance.help}</p>
+        {guidance.warning ? (
+          <p className="flex items-center gap-1.5 text-xs text-warning-700">
+            <AlertTriangle className="size-3.5" />
+            {guidance.warning}
+          </p>
+        ) : null}
+        {parsedMarkup.error ? (
+          <FieldError className="text-error-700">{parsedMarkup.error}</FieldError>
+        ) : null}
+      </Field>
+
+      <PreviewPanel
+        currency={currency}
+        state={preview.state}
+        display={display}
+        error={preview.error}
+      />
+
+      {error && <FieldError className="text-error-700">{error}</FieldError>}
+
+      <div className="flex items-center justify-between gap-3 pt-1">
+        <span className="text-xs text-muted-foreground">
+          {isDirty && blockReason ? blockReason : null}
+        </span>
+        <Button
+          type="button"
+          onClick={() =>
+            mutation.mutate(buildPricingPatch(currency, { faceValue, markup }))
+          }
+          disabled={mutation.isPending || blockReason !== null}
+        >
+          {mutation.isPending ? 'Saving…' : 'Save pricing'}
+        </Button>
+      </div>
+    </FieldGroup>
+  );
+}
+
+/** The backend preview: rate, effective markup, selling price. */
+export function PreviewPanel({
+  currency,
+  state,
+  display,
+  error,
+}: Readonly<{
+  currency: string;
+  state: 'idle' | 'loading' | 'ready' | 'error';
+  display: ReturnType<typeof describePreview> | null;
+  error: unknown;
+}>) {
+  return (
+    <div className="space-y-1.5 rounded-lg border border-border bg-muted/30 p-3 text-sm">
+      {state === 'ready' && display ? (
+        <>
+          <PreviewLine label="Face value" value={display.faceValue} />
+          <PreviewLine label={display.rateLabel} value={display.rate} />
+          <PreviewLine label="Markup applied" value={display.markup} />
+          <PreviewLine
+            label="Selling price preview"
+            value={<span className="font-semibold">{display.ngnPrice}</span>}
+          />
+        </>
+      ) : state === 'error' ? (
+        <p className="text-error-700">{previewErrorMessage(error, currency)}</p>
+      ) : state === 'loading' ? (
+        <p className="text-muted-foreground">Calculating the selling price…</p>
+      ) : (
+        <p className="text-muted-foreground">
+          Enter a valid face value to preview the selling price.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function PreviewLine({
+  label,
+  value,
+}: Readonly<{ label: string; value: React.ReactNode }>) {
+  return (
+    <div className="flex items-baseline justify-between gap-4">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className="tabular-nums">{value}</span>
+    </div>
+  );
+}
+
+/**
+ * A naira product: the typed price IS the price (no conversion, no markup).
+ * Its declared dollar value is still required by the backend.
+ */
+function NairaPriceEditor({
+  product,
+  canEdit,
+}: Readonly<{ product: ProductWithStats; canEdit: boolean }>) {
+  const savedNgn = product.snapshotNgnPrice;
+  const savedUsd = product.priceUsd ?? '';
+  const [ngnPrice, setNgnPrice] = useState(savedNgn);
+  const [declaredUsd, setDeclaredUsd] = useState(savedUsd);
+  const [error, setError] = useState<string | null>(null);
+  const mutation = useSavePricing(product.id, setError);
+
+  if (!canEdit) {
+    return (
+      <Row label="Declared dollar value">
+        <span className="text-sm tabular-nums">
+          {savedUsd ? formatMoney(savedUsd, 'USD') : '—'}
+        </span>
+      </Row>
+    );
+  }
+
+  const inputError = ngnPriceIssue(ngnPrice) ?? declaredUsdIssue(declaredUsd);
+  const blockReason = saveBlockReason({
+    kind: 'NGN_PRICE',
+    isDirty: ngnPrice !== savedNgn || declaredUsd !== savedUsd,
+    inputError,
+    preview: 'idle',
+  });
+
+  return (
+    <FieldGroup>
+      <Field>
+        <FieldLabel htmlFor="ngn-price">Naira price</FieldLabel>
+        <div className="relative">
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+            ₦
+          </span>
+          <Input
+            id="ngn-price"
+            type="text"
+            inputMode="decimal"
+            value={ngnPrice}
+            onChange={(e) => {
+              setNgnPrice(e.target.value);
+              setError(null);
+            }}
+            disabled={mutation.isPending}
+            className="pl-7"
+          />
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Naira products are priced directly — this is the price customers pay.
+          No exchange rate or markup applies.
+        </p>
+      </Field>
+      <Field>
+        <FieldLabel htmlFor="declared-usd">Declared dollar value</FieldLabel>
+        <div className="relative">
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+            $
+          </span>
+          <Input
+            id="declared-usd"
+            type="text"
+            inputMode="decimal"
+            value={declaredUsd}
+            onChange={(e) => {
+              setDeclaredUsd(e.target.value);
+              setError(null);
+            }}
+            disabled={mutation.isPending}
+            className="pl-7"
+          />
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Used to measure USD vouchers against this product. It does not change
+          the naira price.
+        </p>
+      </Field>
+      {error && <FieldError className="text-error-700">{error}</FieldError>}
+      <div className="flex items-center justify-between gap-3 pt-1">
+        <span className="text-xs text-muted-foreground">
+          {blockReason && blockReason !== 'No changes to save' ? blockReason : null}
+        </span>
+        <Button
+          type="button"
+          onClick={() =>
+            mutation.mutate(buildPricingPatch('NGN', { ngnPrice, declaredUsd }))
+          }
+          disabled={mutation.isPending || blockReason !== null}
+        >
+          {mutation.isPending ? 'Saving…' : 'Save pricing'}
+        </Button>
+      </div>
+    </FieldGroup>
   );
 }

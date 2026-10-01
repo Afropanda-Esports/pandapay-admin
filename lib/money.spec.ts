@@ -8,6 +8,12 @@ import {
   formatProductPrice,
   isSupportedCurrency,
   isVoucherCurrency,
+  currencySymbol,
+  formatRatePerUnit,
+  formatFaceValue,
+  faceValueIssue,
+  ngnPriceIssue,
+  declaredUsdIssue,
 } from './money.ts';
 
 // GBP-003: GBP is a real pricing currency in the backend, so the console must
@@ -132,4 +138,49 @@ test('a GBP product never falls back to priceUsd', () => {
       }),
     /GBP product is missing its face value/,
   );
+});
+
+// ─── GBP-005 ─────────────────────────────────────────────────────────────────
+
+test('currencySymbol', () => {
+  assert.equal(currencySymbol('GBP'), '£');
+  assert.equal(currencySymbol('USD'), '$');
+  assert.equal(currencySymbol('NGN'), '₦');
+});
+
+test('formatRatePerUnit shows ₦ per one unit, 2–4 decimals, from the string', () => {
+  assert.equal(formatRatePerUnit('2100.0000', 'GBP'), '₦2,100.00 / £1');
+  assert.equal(formatRatePerUnit('2105.3700', 'GBP'), '₦2,105.37 / £1');
+  assert.equal(formatRatePerUnit('1600.1234', 'USD'), '₦1,600.1234 / $1');
+  assert.equal(formatRatePerUnit('2105.375', 'GBP'), '₦2,105.375 / £1');
+});
+
+test('formatFaceValue always shows two decimals in the product currency', () => {
+  assert.equal(formatFaceValue('10', 'GBP'), '£10.00');
+  assert.equal(formatFaceValue('10.5', 'USD'), '$10.50');
+  assert.equal(formatFaceValue('1250.00', 'GBP'), '£1,250.00');
+});
+
+test('faceValueIssue mirrors the backend rule: positive, ≤ 2 dp, ≤ 10 integer digits', () => {
+  for (const ok of ['10', '10.5', '10.50', '0.01', '9999999999.99']) {
+    assert.equal(faceValueIssue(ok), null, ok);
+  }
+  for (const bad of ['', '0', '0.00', '-1', '1.005', 'abc', '1e3', '12345678901']) {
+    assert.notEqual(faceValueIssue(bad), null, bad);
+  }
+});
+
+test('ngnPriceIssue: at least ₦1, ≤ 2 dp', () => {
+  assert.equal(ngnPriceIssue('8000'), null);
+  assert.equal(ngnPriceIssue('8000.50'), null);
+  for (const bad of ['', '0', '0.99', '1.001', 'x']) {
+    assert.notEqual(ngnPriceIssue(bad), null, bad);
+  }
+});
+
+test('declaredUsdIssue: at least $0.01, ≤ 2 dp', () => {
+  assert.equal(declaredUsdIssue('3.60'), null);
+  for (const bad of ['', '0', '1.001', 'x']) {
+    assert.notEqual(declaredUsdIssue(bad), null, bad);
+  }
 });

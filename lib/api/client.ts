@@ -4,10 +4,23 @@ export class ApiError extends Error {
   constructor(
     public readonly status: number,
     message: string,
+    /** The backend's machine-readable `code` (e.g. `SKU_TAKEN`), when sent. */
+    public readonly code?: string,
+    /**
+     * The backend's structured `details` on a 4xx — e.g. the figures behind a
+     * `409 LARGE_RATE_CHANGE`, which the confirmation dialog shows (GBP-005).
+     */
+    public readonly details?: Record<string, unknown>,
   ) {
     super(message);
     this.name = 'ApiError';
   }
+}
+
+interface ErrorBody {
+  message?: string;
+  code?: string;
+  details?: Record<string, unknown>;
 }
 
 /**
@@ -47,17 +60,22 @@ export async function apiFetch<T>(
   }
 
   if (res.status === 403) {
-    const body = (await res.json().catch(() => null)) as {
-      message?: string;
-    } | null;
-    throw new ApiError(403, body?.message ?? 'You do not have permission for this action');
+    const body = (await res.json().catch(() => null)) as ErrorBody | null;
+    throw new ApiError(
+      403,
+      body?.message ?? 'You do not have permission for this action',
+      body?.code,
+    );
   }
 
   if (!res.ok) {
-    const body = (await res.json().catch(() => null)) as {
-      message?: string;
-    } | null;
-    throw new ApiError(res.status, body?.message ?? 'Request failed');
+    const body = (await res.json().catch(() => null)) as ErrorBody | null;
+    throw new ApiError(
+      res.status,
+      body?.message ?? 'Request failed',
+      body?.code,
+      body?.details,
+    );
   }
 
   if (res.status === 204) return undefined as T;

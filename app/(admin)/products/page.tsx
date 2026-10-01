@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { AlertCircle, RefreshCw } from 'lucide-react';
+import { AlertCircle, Plus, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
 
@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { usePermissions } from '@/hooks/use-permissions';
 import { getProducts } from '@/lib/api/products';
 import { formatProductPrice } from '@/lib/money';
 import type { ProductWithStats } from '@/lib/types';
@@ -165,8 +166,8 @@ function ProductsEmpty({ tab }: Readonly<{ tab: string }>) {
       title={isAll ? 'No products yet' : 'No products in this category'}
       message={
         isAll
-          ? 'Create your first product to start fulfilling orders.'
-          : 'Switch tabs or create a new product in this category.'
+          ? 'A Super Admin can create the first product.'
+          : 'Switch tabs to see other categories.'
       }
     />
   );
@@ -203,6 +204,7 @@ function ProductsBody({
 
 export default function ProductsPage() {
   const [tab, setTab] = useState<string>('ALL');
+  const { can } = usePermissions();
 
   const { data: categories = [] } = useQuery({
     queryKey: ['categories'],
@@ -221,7 +223,16 @@ export default function ProductsPage() {
     <div>
       <PageHeader
         title="Products"
-        description="Gift card and top-up SKUs. New products are added via deployment scripts so WhatsApp vocabulary can be updated alongside."
+        description="Gift card and top-up SKUs. New products start unavailable until their price is reviewed, stock is uploaded and they are marked available."
+        actions={
+          // GBP-006: products:create is Super Admin only (backend SuperAdminGuard).
+          can('products:create') ? (
+            <Button render={<Link href="/products/new" />}>
+              <Plus className="size-4" />
+              Create product
+            </Button>
+          ) : undefined
+        }
       />
 
       <Tabs
