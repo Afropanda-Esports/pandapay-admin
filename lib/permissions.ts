@@ -9,6 +9,7 @@ export type AdminPermission =
   | 'users:manage'
   | 'products:view'
   | 'products:manage'
+  | 'products:create'
   | 'products:pricing'
   | 'pricing:view'
   | 'pricing:manage'
@@ -39,6 +40,8 @@ const MANAGER_PERMISSIONS: AdminPermission[] = [
 
 const SUPER_ADMIN_PERMISSIONS: AdminPermission[] = [
   ...MANAGER_PERMISSIONS,
+  // GBP-006 / DECISION H: POST /admin/products is SuperAdminGuard'ed.
+  'products:create',
   'products:pricing',
   'pricing:manage',
   'admins:manage',
@@ -66,7 +69,7 @@ export const ROLE_LABELS: Record<AdminRole, string> = {
 
 export const ROLE_DESCRIPTIONS: Record<AdminRole, string> = {
   SUPER_ADMIN:
-    'Full root access — team management, global FX, product pricing modes, and all day-to-day operations.',
+    'Full root access — team management, currency rates and the general markup, product creation and pricing, and all day-to-day operations.',
   ADMIN:
-    'Day-to-day operations — orders, users, catalog stock, fraud review, and audit (no team or global FX changes).',
+    'Day-to-day operations — orders, users, catalog stock and availability, fraud review, and audit (no team, rate, pricing or product-creation changes).',
 };

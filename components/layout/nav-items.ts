@@ -37,7 +37,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: 'Brands', href: '/brands', icon: Tag, permission: 'products:view' },
   { label: 'Product lines', href: '/product-lines', icon: Layers, permission: 'products:view' },
   { label: 'Regions', href: '/regions', icon: Globe, permission: 'products:view' },
-  { label: 'Pricing', href: '/pricing', icon: Coins, permission: 'pricing:view' },
+  { label: 'Currency rates', href: '/pricing', icon: Coins, permission: 'pricing:view' },
   { label: 'Fraud Review', href: '/fraud', icon: ShieldAlert, permission: 'fraud:view' },
   {
     label: 'Manual payments',

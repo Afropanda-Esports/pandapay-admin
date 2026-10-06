@@ -4,7 +4,7 @@ PandaPay admin uses two roles backed by `admin_users.role` in the API:
 
 | Role (API) | UI label | Purpose |
 |------------|----------|---------|
-| `SUPER_ADMIN` | **Super Admin** | Root access — team management, global FX, product pricing modes |
+| `SUPER_ADMIN` | **Super Admin** | Root access — team management, currency rates, product pricing and creation |
 | `ADMIN` | **Manager** | Day-to-day operations — orders, users, catalog stock, fraud review |
 
 Permissions are enforced **twice**: UI hides/disables actions, and the NestJS API returns `403` for unauthorized mutations.
@@ -16,17 +16,20 @@ Permissions are enforced **twice**: UI hides/disables actions, and the NestJS AP
 | Dashboard | ✓ | ✓ |
 | Orders (view, fulfill, resend) | ✓ | ✓ |
 | Users (view, unlock PIN, payments) | ✓ | ✓ |
-| Products (CRUD, vouchers, availability) | ✓ | ✓ |
-| Product pricing mode / USD face value | — | ✓ |
-| Pricing (view rate, history, oracle) | ✓ | ✓ |
-| Set global FX rate / recompute all | — | ✓ |
+| Products (view, rename) | ✓ | ✓ |
+| Create product | — | ✓ |
+| Product pricing / face value | — | ✓ |
+| Product stock, availability and archive | ✓ | ✓ |
+| Currency rates (view current and history) | ✓ | ✓ |
+| Set manual currency rate / general markup / recompute | — | ✓ |
 | Fraud review (approve / reject) | ✓ | ✓ |
 | Audit log | ✓ | ✓ |
 | Team (create admins, reset passwords) | — | ✓ |
 
 ## Backend enforcement (Super Admin only)
 
-- `POST /admin/pricing/rate`, `POST /admin/pricing/recompute`
+- `POST /admin/products`
+- `POST /admin/pricing/rates/:currency`, `POST /admin/pricing/rate`, `POST /admin/pricing/recompute`
 - `PATCH /admin/products/:id/pricing`
 - `GET/POST/PATCH /admin/admins/*` (except `GET /admin/admins/directory` for audit labels)
 
