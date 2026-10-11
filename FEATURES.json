@@ -13,6 +13,14 @@
   },
   "features": [
     {
+      "id": "GBP-010-FE",
+      "name": "Currency rates: GBP card is oracle + shared general markup (no manual GBP/NGN)",
+      "priority": 1,
+      "verify": "pnpm test:unit && pnpm exec tsc --noEmit && pnpm lint && API_URL=http://localhost:3000 pnpm build",
+      "status": "PENDING_REVIEW",
+      "notes": "Contract: pandapay-be/skills/.harness/contracts/GBP-010.md admin slice. EXECUTED 2026-10-06 on feat/gbp-010-fe-oracle-gbp. Currency rates copy treats GBP as oracle; canSetRate(ORACLE) false so no set-GBP dialog. tsc/lint(0 err)/build green; unit 165. Executor did not self-PASS."
+    },
+    {
       "id": "CAT-011-FE",
       "name": "Remove catalog Create buttons — regions/categories/brands/lines/products are script-only",
       "priority": 1,

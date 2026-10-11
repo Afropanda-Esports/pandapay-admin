@@ -14,7 +14,12 @@ export const getCurrentRate = () =>
   apiFetch<ExchangeRate | null>('/admin/pricing/rate');
 
 export const getOracleRate = () =>
-  apiFetch<{ oracleRate: number | null; lastFetchedAt: string | null }>('/admin/pricing/oracle');
+  apiFetch<{
+    oracleRate: number | null;
+    lastFetchedAt: string | null;
+    oracleNgnPerGbp: string | null;
+    gbpLastFetchedAt: string | null;
+  }>('/admin/pricing/oracle');
 
 export const getRateHistory = (limit = 50) =>
   apiFetch<ExchangeRateHistoryItem[]>(
