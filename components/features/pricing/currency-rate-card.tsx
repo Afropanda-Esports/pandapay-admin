@@ -26,10 +26,9 @@ type RateEntry = CurrencyRatesOverview['rates'][number];
 /**
  * One converted currency's rate — GBP-005.
  *
- *   USD  automatic (oracle). Read-only for everyone.
- *   GBP  manual. Source, age, who set it, how many products it prices, a
- *        warning once it is older than 3 days, and "Set new rate" for a Super
- *        Admin only.
+ *   USD  automatic (oracle). Read-only.
+ *   GBP  automatic (oracle, fx_rates). Read-only. Set-rate is only for a
+ *        remaining MANUAL management value if one ever exists.
  */
 export function CurrencyRateCard({
   entry,

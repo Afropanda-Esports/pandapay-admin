@@ -47,11 +47,32 @@ import type {
 
 const HISTORY_SKELETON = ['h1', 'h2', 'h3', 'h4'];
 
-/** The latest live oracle reading, under the USD card. Display only. */
+/** The latest live oracle reading under a converted-currency card. Display only. */
 function OracleReading({
+  currency,
   oracleRate,
   lastFetchedAt,
-}: Readonly<{ oracleRate: number | null; lastFetchedAt: string | null }>) {
+  oracleNgnPerGbp,
+  gbpLastFetchedAt,
+}: Readonly<{
+  currency: string;
+  oracleRate: number | null;
+  lastFetchedAt: string | null;
+  oracleNgnPerGbp: string | null;
+  gbpLastFetchedAt: string | null;
+}>) {
+  if (currency === 'GBP') {
+    if (!oracleNgnPerGbp) return null;
+    return (
+      <p className="text-xs text-muted-foreground">
+        Latest oracle reading (CoinGecko USDT NGN÷GBP): ₦{oracleNgnPerGbp} / £1
+        {gbpLastFetchedAt
+          ? `, fetched ${formatDistanceToNow(parseISO(gbpLastFetchedAt), { addSuffix: true })}`
+          : ''}
+        .
+      </p>
+    );
+  }
   if (!oracleRate) return null;
   return (
     <p className="text-xs text-muted-foreground">
@@ -320,7 +341,7 @@ export default function PricingPage() {
     <div>
       <PageHeader
         title="Currency rates"
-        description="USD/NGN comes from the oracle; GBP/NGN is a business rate set by a Super Admin. Each product is priced from its own currency’s rate plus markup — there is no conversion through USD."
+        description="USD/NGN and GBP/NGN both come from the oracle. Super Admin sets one general markup (plus optional per-product markup). Each product is priced from its own currency’s rate plus markup — there is no conversion through USD."
         actions={canManagePricing ? <RecomputeButton /> : undefined}
       />
 
@@ -351,8 +372,11 @@ export default function PricingPage() {
                 footnote={
                   entry.management === 'ORACLE' ? (
                     <OracleReading
+                      currency={entry.currency}
                       oracleRate={oracle?.oracleRate ?? null}
                       lastFetchedAt={oracle?.lastFetchedAt ?? null}
+                      oracleNgnPerGbp={oracle?.oracleNgnPerGbp ?? null}
+                      gbpLastFetchedAt={oracle?.gbpLastFetchedAt ?? null}
                     />
                   ) : undefined
                 }
@@ -403,7 +427,7 @@ export default function PricingPage() {
       )}
 
       <div className="mt-6">
-        <h2 className="mb-3 text-sm font-medium">GBP/NGN history (manual)</h2>
+        <h2 className="mb-3 text-sm font-medium">GBP/NGN history (oracle)</h2>
         {gbpHistoryLoading ? (
           <HistorySkeleton />
         ) : gbpHistory && gbpHistory.length > 0 ? (
@@ -411,7 +435,7 @@ export default function PricingPage() {
         ) : (
           <EmptyState
             title="No GBP rate yet"
-            message="GBP/NGN rates a Super Admin sets will appear here."
+            message="GBP/NGN rates the oracle writes will appear here."
           />
         )}
       </div>

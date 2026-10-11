@@ -24,9 +24,10 @@ const daysAgo = (d: number, extraMs = 0) =>
   new Date(NOW.getTime() - d * 86_400_000 - extraMs).toISOString();
 
 describe('managementLabel / canSetRate', () => {
-  test('USD is automatic (oracle) and can never be set here', () => {
+  test('an oracle-managed rate can never be set here, including GBP', () => {
     assert.equal(managementLabel('ORACLE'), 'Automatic · oracle');
     assert.equal(canSetRate('ORACLE', true), false);
+    assert.equal(canSetRate('ORACLE', false), false);
   });
 
   test('GBP is manual; only a Super Admin (pricing:manage) can set it', () => {

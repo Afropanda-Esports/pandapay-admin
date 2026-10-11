@@ -4,12 +4,11 @@ import { formatRatePerUnit, isSupportedCurrency } from './money.ts';
 import type { LargeRateChangeDetails, RateManagement } from '@/lib/types';
 
 /**
- * The Currency rates page — GBP-005.
+ * The Currency rates page — GBP-010.
  *
- *   USD → NGN  automatic: the oracle's rate. Read-only here, always.
- *   GBP → NGN  manual: a business rate a Super Admin sets (DECISION C), with a
- *              confirmation above a 10 % move (DECISION R, enforced by the
- *              backend) and a staleness WARNING after 3 days (DECISION Q).
+ *   USD → NGN  automatic: CoinGecko USDT/NGN. Read-only here.
+ *   GBP → NGN  automatic: CoinGecko USDT NGN÷GBP, stored in fx_rates. Read-only.
+ *   Super Admin sets one general markup (not a typed GBP/NGN rate).
  *
  * Nothing here decides whether a rate is accepted — the backend does. These
  * helpers only describe what it returned.
