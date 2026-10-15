@@ -33,7 +33,6 @@ import {
 import { ApiError } from '@/lib/api/client';
 import { getOrders, resendOrder } from '@/lib/api/orders';
 import { formatOrderSource } from '@/lib/order-source';
-import { OrderVoucherCodes } from '@/components/features/orders/order-voucher-codes';
 import type { Order, PaginatedResponse, PaymentMode } from '@/lib/types';
 
 const PAGE_SIZE = 20;
@@ -134,7 +133,6 @@ function OrdersTable({ orders }: Readonly<OrdersTableProps>) {
             <th className="px-3 py-2 font-medium">Order</th>
             <th className="px-3 py-2 font-medium">User</th>
             <th className="px-3 py-2 font-medium">Product</th>
-            <th className="px-3 py-2 font-medium">Code</th>
             <th className="px-3 py-2 font-medium">Amount</th>
             <th className="px-3 py-2 font-medium">Mode</th>
             <th className="px-3 py-2 font-medium">Source</th>
@@ -162,9 +160,6 @@ function OrdersTable({ orders }: Readonly<OrdersTableProps>) {
                 )}
               </td>
               <td className="px-3 py-2">{order.product?.name ?? '—'}</td>
-              <td className="px-3 py-2">
-                <OrderVoucherCodes codes={order.voucherCodes} />
-              </td>
               <td className="px-3 py-2 tabular-nums">
                 {formatAmount(order.amount)}
               </td>

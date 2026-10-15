@@ -13,12 +13,20 @@
   },
   "features": [
     {
+      "id": "ORD-006-FE",
+      "name": "Order detail shows applied PandaPay discount code",
+      "priority": 1,
+      "verify": "node --experimental-strip-types --test lib/order-voucher-codes-display.spec.ts && pnpm exec tsc --noEmit && pnpm lint && pnpm build",
+      "status": "PENDING_REVIEW",
+      "notes": "Contract: pandapay-be/skills/.harness/contracts/ORD-006.md admin slice. EXECUTED 2026-10-15 on feat/ord-006-admin-discount-code. Detail Discount code row; list Code column gone. VERIFY: node:test 3/3, tsc/lint green, API_URL=http://localhost:3000 pnpm build green. Executor did not self-PASS."
+    },
+    {
       "id": "ORD-005-FE",
       "name": "Orders table and detail show purchased gift-card PIN",
       "priority": 1,
       "verify": "node --experimental-strip-types --test lib/order-voucher-codes-display.spec.ts && pnpm exec tsc --noEmit && pnpm lint && pnpm build",
-      "status": "PENDING_REVIEW",
-      "notes": "Contract: skills/.harness/contracts/ORD-005-FE.md — EXECUTED 2026-10-15 on feat/ord-005-admin-voucher-codes. Code column + detail PINs. VERIFY: node:test 4/4, tsc/lint green, API_URL=http://localhost:3000 pnpm build green. Executor did not self-PASS."
+      "status": "FAIL",
+      "notes": "SUPERSEDED by ORD-006-FE 2026-10-15. List Code column and PIN rows removed."
     },
     {
       "id": "GBP-010-FE",

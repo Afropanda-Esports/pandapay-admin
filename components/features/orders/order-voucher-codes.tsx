@@ -5,15 +5,15 @@ import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import {
-  formatOrderVoucherCodes,
-  orderVoucherCodesCopyText,
+  appliedDiscountCodeCopyText,
+  formatAppliedDiscountCode,
 } from '@/lib/order-voucher-codes-display';
 
-export function OrderVoucherCodes({
-  codes,
-}: Readonly<{ codes: string[] | null | undefined }>) {
-  const copyText = orderVoucherCodesCopyText(codes);
-  const shown = formatOrderVoucherCodes(codes);
+export function AppliedDiscountCode({
+  code,
+}: Readonly<{ code: string | null | undefined }>) {
+  const copyText = appliedDiscountCodeCopyText(code);
+  const shown = formatAppliedDiscountCode(code);
 
   const copy = async () => {
     if (!copyText) return;
@@ -32,7 +32,7 @@ export function OrderVoucherCodes({
           variant="ghost"
           size="sm"
           className="h-6 shrink-0 px-1"
-          aria-label="Copy voucher code"
+          aria-label="Copy discount code"
           onClick={() => {
             void copy();
           }}

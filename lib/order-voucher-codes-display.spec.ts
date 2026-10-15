@@ -2,28 +2,23 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import {
-  formatOrderVoucherCodes,
-  orderVoucherCodesCopyText,
+  appliedDiscountCodeCopyText,
+  formatAppliedDiscountCode,
 } from './order-voucher-codes-display.ts';
 
-test('missing, undefined, and empty render as an em dash', () => {
-  assert.equal(formatOrderVoucherCodes(undefined), '—');
-  assert.equal(formatOrderVoucherCodes(null), '—');
-  assert.equal(formatOrderVoucherCodes([]), '—');
+test('missing and blank render as an em dash', () => {
+  assert.equal(formatAppliedDiscountCode(undefined), '—');
+  assert.equal(formatAppliedDiscountCode(null), '—');
+  assert.equal(formatAppliedDiscountCode(''), '—');
+  assert.equal(formatAppliedDiscountCode('   '), '—');
 });
 
-test('one PIN is the plaintext, not an em dash', () => {
-  const shown = formatOrderVoucherCodes(['AAAA']);
-  assert.equal(shown, 'AAAA');
-  assert.notEqual(shown, '—');
+test('a promotional code is shown as plaintext', () => {
+  assert.equal(formatAppliedDiscountCode('PANDA-TEST'), 'PANDA-TEST');
 });
 
-test('two PINs join with a newline', () => {
-  assert.equal(formatOrderVoucherCodes(['AAAA', 'BBBB']), 'AAAA\nBBBB');
-});
-
-test('copy text is the joined PINs, or null when empty', () => {
-  assert.equal(orderVoucherCodesCopyText(['AAAA', 'BBBB']), 'AAAA\nBBBB');
-  assert.equal(orderVoucherCodesCopyText([]), null);
-  assert.equal(orderVoucherCodesCopyText(undefined), null);
+test('copy text is the code, or null when empty', () => {
+  assert.equal(appliedDiscountCodeCopyText('PANDA-TEST'), 'PANDA-TEST');
+  assert.equal(appliedDiscountCodeCopyText(''), null);
+  assert.equal(appliedDiscountCodeCopyText(undefined), null);
 });
