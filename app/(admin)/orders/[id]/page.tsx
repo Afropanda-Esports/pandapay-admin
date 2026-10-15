@@ -34,6 +34,7 @@ import { usePermissions } from '@/hooks/use-permissions';
 import { getOrder, resendOrder, fulfillOrder, refundOrder, retryOrder } from '@/lib/api/orders';
 import { formatProductPrice } from '@/lib/money';
 import { orderPricingView } from '@/lib/order-pricing';
+import { OrderVoucherCodes } from '@/components/features/orders/order-voucher-codes';
 import { formatOrderSource } from '@/lib/order-source';
 import type { OrderDetail, PaymentMode } from '@/lib/types';
 
@@ -208,6 +209,10 @@ function PaymentInfo({ order }: Readonly<{ order: OrderDetail }>) {
       <DetailRow
         label="Voucher used"
         value={order.voucherIsUsed ? 'Yes' : 'No'}
+      />
+      <DetailRow
+        label="Code"
+        value={<OrderVoucherCodes codes={order.voucherCodes} />}
       />
     </InfoCard>
   );
@@ -386,6 +391,10 @@ function VoucherInfo({ order }: Readonly<{ order: OrderDetail }>) {
         value={order.voucherAssigned ? 'Yes' : 'No'}
       />
       <DetailRow label="Used" value={order.voucherIsUsed ? 'Yes' : 'No'} />
+      <DetailRow
+        label="Code"
+        value={<OrderVoucherCodes codes={order.voucherCodes} />}
+      />
     </InfoCard>
   );
 }
