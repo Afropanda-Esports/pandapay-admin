@@ -1,16 +1,17 @@
 const MISSING = '—';
 
-export function formatOrderVoucherCodes(
-  codes: string[] | null | undefined,
+export function formatAppliedDiscountCode(
+  code: string | null | undefined,
 ): string {
-  if (codes == null || codes.length === 0) return MISSING;
-  return codes.join('\n');
+  const trimmed = code?.trim();
+  if (!trimmed) return MISSING;
+  return trimmed;
 }
 
 /** Clipboard payload. Null when there is nothing to copy. */
-export function orderVoucherCodesCopyText(
-  codes: string[] | null | undefined,
+export function appliedDiscountCodeCopyText(
+  code: string | null | undefined,
 ): string | null {
-  if (codes == null || codes.length === 0) return null;
-  return codes.join('\n');
+  const trimmed = code?.trim();
+  return trimmed ? trimmed : null;
 }

@@ -183,11 +183,6 @@ export interface Order {
   id: string;
   userId: string;
   productId: string;
-  /**
-   * Consumed gift-card PINs for this order. Empty when none (or older API).
-   * Never unused warehouse stock.
-   */
-  voucherCodes?: string[];
   amount: string;
   paymentMode: PaymentMode;
   paymentCollectionMode?: 'PAYSTACK_AUTO' | 'MANUAL_BANK_TRANSFER';
@@ -258,6 +253,8 @@ export interface OrderDetail extends Order, OrderPricingSnapshot {
   items?: OrderItemDetail[];
   voucherAssigned: boolean;
   voucherIsUsed: boolean;
+  /** PandaPay promotional code used at checkout. Null when none. */
+  appliedDiscountCode?: string | null;
   rateSnapshot?: string | null;
   paystackDvaReference?: string | null;
   /** API field from GET /admin/orders/:id */
