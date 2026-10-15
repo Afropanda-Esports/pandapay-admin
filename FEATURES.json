@@ -13,6 +13,14 @@
   },
   "features": [
     {
+      "id": "ORD-005-FE",
+      "name": "Orders table and detail show purchased gift-card PIN",
+      "priority": 1,
+      "verify": "node --experimental-strip-types --test lib/order-voucher-codes-display.spec.ts && pnpm exec tsc --noEmit && pnpm lint && pnpm build",
+      "status": "PENDING_REVIEW",
+      "notes": "Contract: skills/.harness/contracts/ORD-005-FE.md — EXECUTED 2026-10-15 on feat/ord-005-admin-voucher-codes. Code column + detail PINs. VERIFY: node:test 4/4, tsc/lint green, API_URL=http://localhost:3000 pnpm build green. Executor did not self-PASS."
+    },
+    {
       "id": "GBP-010-FE",
       "name": "Currency rates: GBP card is oracle + shared general markup (no manual GBP/NGN)",
       "priority": 1,
