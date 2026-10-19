@@ -13,6 +13,14 @@
   },
   "features": [
     {
+      "id": "SEC-003-FE",
+      "name": "Admin login: authentication-code step",
+      "priority": 1,
+      "verify": "pnpm exec tsc --noEmit && pnpm lint && API_URL=http://localhost:3000 pnpm build",
+      "status": "PENDING_REVIEW",
+      "notes": "Contract: pandapay-be/skills/.harness/contracts/SEC-003.md admin slice. EXECUTED 2026-10-19 on feat/sec-003-admin-login-mfa. Two-step login; cookie only after verify. VERIFY: tsc/lint/build green. Executor did not self-PASS."
+    },
+    {
       "id": "ORD-006-FE",
       "name": "Order detail shows applied PandaPay discount code",
       "priority": 1,
