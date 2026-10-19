@@ -526,7 +526,13 @@ export interface FeatureFlag {
   updatedAt: string;
 }
 
-/** Returned by `/api/auth/login` — JWT is stored in HttpOnly cookie only. */
+/** Password step succeeded — a code was emailed. No session cookie yet. */
+export interface MfaRequiredResponse {
+  status: 'MFA_REQUIRED';
+  challenge_id: string;
+}
+
+/** Returned by `/api/auth/login/verify` — JWT is stored in HttpOnly cookie only. */
 export interface LoginResponse {
   must_change_password: boolean;
   role?: AdminRole;

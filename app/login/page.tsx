@@ -8,7 +8,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
 
-import { login } from '@/lib/api/auth';
+import { login, resendLoginCode, verifyLogin } from '@/lib/api/auth';
 import { ApiError } from '@/lib/api/client';
 import { Logo } from '@/components/shared/logo';
 import { Button } from '@/components/ui/button';
@@ -21,36 +21,53 @@ import {
   FieldLabel,
 } from '@/components/ui/field';
 
-const schema = z.object({
+const credentialsSchema = z.object({
   email: z.email('Enter a valid email'),
   password: z.string().min(1, 'Password is required'),
 });
 
-type FormValues = z.infer<typeof schema>;
+const codeSchema = z.object({
+  code: z.string().regex(/^\d{6}$/, 'Enter the 6-digit code'),
+});
+
+type CredentialsValues = z.infer<typeof credentialsSchema>;
+type CodeValues = z.infer<typeof codeSchema>;
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const [submitting, setSubmitting] = useState(false);
+  const [challengeId, setChallengeId] = useState<string | null>(null);
+  const [emailHint, setEmailHint] = useState('');
 
-  const form = useForm<FormValues>({
-    resolver: zodResolver(schema),
+  const credentials = useForm<CredentialsValues>({
+    resolver: zodResolver(credentialsSchema),
     defaultValues: { email: '', password: '' },
   });
 
-  const onSubmit = form.handleSubmit(async (data) => {
+  const codeForm = useForm<CodeValues>({
+    resolver: zodResolver(codeSchema),
+    defaultValues: { code: '' },
+  });
+
+  const finishSession = (res: { must_change_password: boolean }) => {
+    queryClient.removeQueries({ queryKey: ['me'] });
+    if (res.must_change_password) {
+      router.push('/change-password');
+      return;
+    }
+    const redirect = searchParams.get('redirect') ?? '/dashboard';
+    router.push(redirect);
+  };
+
+  const onCredentials = credentials.handleSubmit(async (data) => {
     setSubmitting(true);
     try {
       const res = await login(data.email, data.password);
-      queryClient.removeQueries({ queryKey: ['me'] });
-
-      if (res.must_change_password) {
-        router.push('/change-password');
-        return;
-      }
-      const redirect = searchParams.get('redirect') ?? '/dashboard';
-      router.push(redirect);
+      setChallengeId(res.challenge_id);
+      setEmailHint(data.email);
+      codeForm.reset({ code: '' });
     } catch (error) {
       const message =
         error instanceof ApiError ? error.message : 'Something went wrong';
@@ -60,8 +77,79 @@ function LoginForm() {
     }
   });
 
+  const onCode = codeForm.handleSubmit(async (data) => {
+    if (!challengeId) return;
+    setSubmitting(true);
+    try {
+      const res = await verifyLogin(challengeId, data.code);
+      finishSession(res);
+    } catch (error) {
+      const message =
+        error instanceof ApiError ? error.message : 'Something went wrong';
+      toast.error(message);
+    } finally {
+      setSubmitting(false);
+    }
+  });
+
+  const onResend = async () => {
+    if (!challengeId) return;
+    setSubmitting(true);
+    try {
+      const res = await resendLoginCode(challengeId);
+      setChallengeId(res.challenge_id);
+      toast.success('A new code was sent to your admin email');
+    } catch (error) {
+      const message =
+        error instanceof ApiError ? error.message : 'Something went wrong';
+      toast.error(message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (challengeId) {
+    return (
+      <form onSubmit={onCode} noValidate>
+        <FieldGroup>
+          <p className="text-sm text-muted-foreground">
+            We sent a 6-digit sign-in code to {emailHint}. Enter it to continue.
+          </p>
+          <Field>
+            <FieldLabel htmlFor="code">Authentication code</FieldLabel>
+            <Input
+              id="code"
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              autoFocus
+              disabled={submitting}
+              maxLength={6}
+              {...codeForm.register('code')}
+            />
+            <FieldError>{codeForm.formState.errors.code?.message}</FieldError>
+          </Field>
+          <Button type="submit" size="lg" disabled={submitting} className="w-full">
+            {submitting ? 'Verifying…' : 'Verify code'}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            disabled={submitting}
+            className="w-full"
+            onClick={() => {
+              void onResend();
+            }}
+          >
+            Resend code
+          </Button>
+        </FieldGroup>
+      </form>
+    );
+  }
+
   return (
-    <form onSubmit={onSubmit} noValidate>
+    <form onSubmit={onCredentials} noValidate>
       <FieldGroup>
         <Field>
           <FieldLabel htmlFor="email">Email</FieldLabel>
@@ -71,9 +159,9 @@ function LoginForm() {
             autoComplete="email"
             autoFocus
             disabled={submitting}
-            {...form.register('email')}
+            {...credentials.register('email')}
           />
-          <FieldError>{form.formState.errors.email?.message}</FieldError>
+          <FieldError>{credentials.formState.errors.email?.message}</FieldError>
         </Field>
 
         <Field>
@@ -83,9 +171,11 @@ function LoginForm() {
             type="password"
             autoComplete="current-password"
             disabled={submitting}
-            {...form.register('password')}
+            {...credentials.register('password')}
           />
-          <FieldError>{form.formState.errors.password?.message}</FieldError>
+          <FieldError>
+            {credentials.formState.errors.password?.message}
+          </FieldError>
         </Field>
 
         <Button type="submit" size="lg" disabled={submitting} className="w-full">
