@@ -20,6 +20,7 @@ import {
   FieldGroup,
   FieldLabel,
 } from '@/components/ui/field';
+import { safeRedirectPath } from '@/lib/safe-redirect';
 
 const credentialsSchema = z.object({
   email: z.email('Enter a valid email'),
@@ -57,8 +58,7 @@ function LoginForm() {
       router.push('/change-password');
       return;
     }
-    const redirect = searchParams.get('redirect') ?? '/dashboard';
-    router.push(redirect);
+    router.push(safeRedirectPath(searchParams.get('redirect')));
   };
 
   const onCredentials = credentials.handleSubmit(async (data) => {
