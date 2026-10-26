@@ -21,7 +21,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { usePermissions } from '@/hooks/use-permissions';
 import { getProducts } from '@/lib/api/products';
 import { formatProductPrice } from '@/lib/money';
@@ -35,6 +34,8 @@ import type { ProductWithStats } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 const SKELETON_KEYS = ['s1', 's2', 's3', 's4', 's5', 's6', 's7', 's8'];
+
+const ALL_CATEGORIES = 'ALL';
 
 const STOCK_SELECT_ITEMS: Record<StockFilter, string> = {
   all: 'All stock',
@@ -132,14 +133,14 @@ function ProductsError({ onRetry }: Readonly<{ onRetry: () => void }>) {
 }
 
 function ProductsEmpty({ tab }: Readonly<{ tab: string }>) {
-  const isAll = tab === 'ALL';
+  const isAll = tab === ALL_CATEGORIES;
   return (
     <EmptyState
       title={isAll ? 'No products yet' : 'No products in this category'}
       message={
         isAll
           ? 'A Super Admin can create the first product.'
-          : 'Switch tabs to see other categories.'
+          : 'Choose another category to see the rest of the catalog.'
       }
     />
   );
@@ -277,7 +278,7 @@ function ProductsBody({
 }
 
 export default function ProductsPage() {
-  const [tab, setTab] = useState<string>('ALL');
+  const [tab, setTab] = useState<string>(ALL_CATEGORIES);
   const [query, setQuery] = useState('');
   const [stock, setStock] = useState<StockFilter>('all');
   const { can } = usePermissions();
@@ -290,10 +291,14 @@ export default function ProductsPage() {
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['products', tab],
     queryFn: () =>
-      getProducts(tab === 'ALL' ? undefined : tab),
+      getProducts(tab === ALL_CATEGORIES ? undefined : tab),
   });
 
   const products = data;
+  const categoryItems: Record<string, string> = {
+    [ALL_CATEGORIES]: 'All categories',
+    ...Object.fromEntries(categories.map((c) => [c.id, c.name])),
+  };
 
   return (
     <div>
@@ -311,21 +316,6 @@ export default function ProductsPage() {
         }
       />
 
-      <Tabs
-        value={tab}
-        onValueChange={setTab}
-        className="mb-4"
-      >
-        <TabsList>
-          <TabsTrigger value="ALL">All Categories</TabsTrigger>
-          {categories.map((c) => (
-            <TabsTrigger key={c.id} value={c.id}>
-              {c.name}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
-
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <div className="relative min-w-56 flex-1 max-w-sm">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -337,6 +327,28 @@ export default function ProductsPage() {
             aria-label="Search products"
           />
         </div>
+        <Select
+          items={categoryItems}
+          value={tab}
+          onValueChange={(value) => {
+            if (!value) return;
+            if (value === ALL_CATEGORIES || categories.some((c) => c.id === value)) {
+              setTab(value);
+            }
+          }}
+        >
+          <SelectTrigger className="w-48" aria-label="Filter by category">
+            <SelectValue placeholder="Category" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL_CATEGORIES}>All categories</SelectItem>
+            {categories.map((c) => (
+              <SelectItem key={c.id} value={c.id}>
+                {c.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Select
           items={STOCK_SELECT_ITEMS}
           value={stock}
