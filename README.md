@@ -20,7 +20,7 @@ Start the backend first (`pandapay-be` on port 3000). See [pandapay-be/INTEGRATI
 | `SUPER_ADMIN` | Super Admin | Full platform control including **Team** and global FX |
 | `ADMIN` | Manager | Orders, users, products, fraud review, audit (no team / FX writes) |
 
-See [docs/ROLES.md](./docs/ROLES.md) for the full matrix. Create managers from **Team** after logging in as Super Admin.
+Create managers from **Team** after logging in as Super Admin.
 
 ## Security model
 
@@ -45,16 +45,6 @@ Production checklist:
 |----------|----------|-------------|
 | `API_URL` | Yes (build) | NestJS base URL for server routes (`/api/auth/*`, `/api/backend/*`) |
 | `NEXT_PUBLIC_API_URL` | Fallback | Used only if `API_URL` is unset (legacy) |
-
-## Documentation
-
-| Doc | Purpose |
-|-----|---------|
-| [docs/INTEGRATION.md](./docs/INTEGRATION.md) | Which pages work vs which APIs are missing on the backend |
-| [docs/admin-frontend.md](./docs/admin-frontend.md) | Stack, folder layout, API shapes, UI patterns |
-| [docs/implementation-plan.md](./docs/implementation-plan.md) | Original phased build plan (mostly complete) |
-| [../pandapay-be/INTEGRATION.md](../pandapay-be/INTEGRATION.md) | Canonical admin ↔ backend contract (shared) |
-| [../pandapay-be/STANDARDS_AUDIT.md](../pandapay-be/STANDARDS_AUDIT.md) | `.cursorrules` compliance backlog |
 
 ## Routes
 

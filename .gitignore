@@ -40,3 +40,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# internal planning and agent docs (kept locally, not published)
+/docs/
+/FEATURES.json
+/skills/.harness/
