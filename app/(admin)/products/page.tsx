@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { AlertCircle, Plus, RefreshCw, Search } from 'lucide-react';
+import { AlertCircle, ChevronDown, Plus, RefreshCw, Search } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
@@ -213,7 +213,7 @@ function ProductsTable({ products }: Readonly<{ products: ProductWithStats[] }>)
         </thead>
         <tbody>
           {groups.map((group) => (
-            <FragmentGroup key={group.brandId ?? group.brandName} group={group} />
+            <BrandSection key={group.brandId ?? group.brandName} group={group} />
           ))}
         </tbody>
       </table>
@@ -221,27 +221,42 @@ function ProductsTable({ products }: Readonly<{ products: ProductWithStats[] }>)
   );
 }
 
-function FragmentGroup({
+function BrandSection({
   group,
 }: Readonly<{
   group: ReturnType<typeof groupProductsByBrand>[number];
 }>) {
+  const [open, setOpen] = useState(true);
+
   return (
     <>
       <tr className="bg-muted/20">
-        <th
-          colSpan={5}
-          className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground"
-        >
-          {group.brandName}
-          <span className="ml-2 font-normal normal-case text-muted-foreground/80">
-            {group.products.length}
-          </span>
+        <th colSpan={5} className="px-0 py-0 font-medium">
+          <button
+            type="button"
+            aria-expanded={open}
+            onClick={() => setOpen((value) => !value)}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:bg-muted/40"
+          >
+            <ChevronDown
+              className={cn(
+                'size-4 shrink-0 transition-transform',
+                !open && '-rotate-90',
+              )}
+              aria-hidden
+            />
+            {group.brandName}
+            <span className="font-normal normal-case text-muted-foreground/80">
+              {group.products.length}
+            </span>
+          </button>
         </th>
       </tr>
-      {group.products.map((product) => (
-        <ProductRow key={product.id} product={product} />
-      ))}
+      {open
+        ? group.products.map((product) => (
+            <ProductRow key={product.id} product={product} />
+          ))
+        : null}
     </>
   );
 }
