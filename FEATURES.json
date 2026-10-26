@@ -1,6 +1,6 @@
 {
   "project": "pandapay-admin",
-  "updated": "2026-10-01",
+  "updated": "2026-10-26",
   "legend": {
     "status": [
       "FAIL",
@@ -163,6 +163,14 @@
       "verify": "pnpm test:unit && pnpm exec tsc --noEmit && pnpm lint && API_URL=http://localhost:3000 pnpm build",
       "status": "PENDING_REVIEW",
       "notes": "Contract: pandapay-be skills/.harness/contracts/GBP-005-006.md. EXECUTED 2026-10-01 on feat/gbp-admin-completion off main@95cb5dc in one consolidated admin delivery with GBP-005-FE. Super Admin-only /products/new derives currency from Region, includes inactive regions for staging, filters dependent hierarchy selects, requires name/SKU, preserves blank markup as null and explicit 0, waits for the backend preview, and defaults availability off. Product detail shows SKU, region and a readiness checklist. Verify: 165/165 unit tests, tsc clean, lint 0 errors / 1 pre-existing warning, build green. Executor did not self-PASS."
+    },
+    {
+      "id": "ADMIN-FE-009",
+      "name": "Products list: search, stock filter, and brand-grouped table",
+      "priority": 1,
+      "verify": "pnpm test:unit && pnpm exec tsc --noEmit && pnpm lint && API_URL=http://localhost:3000 pnpm build",
+      "status": "PENDING_REVIEW",
+      "notes": "Contract: skills/.harness/contracts/ADMIN-FE-009.md — EXECUTED 2026-10-26 on feat/admin-fe-009-products-list. Search + stock filter + brand-grouped table on /products. VERIFY: test:unit 178/178, tsc/lint/build green. Executor did not self-PASS."
     }
   ]
 }
