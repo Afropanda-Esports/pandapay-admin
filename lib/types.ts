@@ -302,6 +302,29 @@ export interface SupportRequest {
   updatedAt: string;
 }
 
+export type WhatsappMessageDirection = 'inbound' | 'outbound';
+
+export interface WhatsappMessage {
+  id: string;
+  direction: WhatsappMessageDirection;
+  whatsappNumber: string;
+  userId: string | null;
+  metaMessageId: string | null;
+  body: string;
+  intent: string | null;
+  reason: string | null;
+  conversationStep: string | null;
+  orderId: string | null;
+  createdAt: string;
+}
+
+export interface WhatsappMessageSummary {
+  byIntent: Record<string, number>;
+  byReason: Record<string, number>;
+  totalInbound: number;
+  totalOutbound: number;
+}
+
 // ─── Products ─────────────────────────────────────────────────────────────────
 
 export interface Region {

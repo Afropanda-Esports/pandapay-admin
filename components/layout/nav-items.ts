@@ -16,6 +16,7 @@ import {
   FolderTree,
   Landmark,
   LifeBuoy,
+  MessageSquare,
   type LucideIcon,
 } from 'lucide-react';
 import type { AdminPermission } from '@/lib/permissions';
@@ -55,6 +56,12 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'Support requests',
     href: '/support-requests',
     icon: LifeBuoy,
+    permission: 'orders:view',
+  },
+  {
+    label: 'WhatsApp messages',
+    href: '/whatsapp-messages',
+    icon: MessageSquare,
     permission: 'orders:view',
   },
   { label: 'Feature Flags', href: '/feature-flags', icon: Flag, permission: 'feature-flags:view' },
