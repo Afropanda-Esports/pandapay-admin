@@ -160,10 +160,17 @@ export const updateProductPricing = (
     body: JSON.stringify(body),
   });
 
-export const uploadVouchers = (id: string, codes: string[]) =>
+export type UploadVouchersBody = {
+  codes: string[];
+  unitCostAmount: string;
+  /** Defaults to NGN on the server when omitted. */
+  unitCostCurrency?: 'NGN' | 'USD' | 'GBP';
+};
+
+export const uploadVouchers = (id: string, body: UploadVouchersBody) =>
   apiFetch<{ inserted: number }>(`/admin/products/${id}/vouchers`, {
     method: 'POST',
-    body: JSON.stringify({ codes }),
+    body: JSON.stringify(body),
   });
 
 export const getVoucherStats = (id: string) =>

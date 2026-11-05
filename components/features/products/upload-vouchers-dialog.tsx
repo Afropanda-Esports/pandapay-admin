@@ -16,11 +16,25 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { ApiError } from '@/lib/api/client';
 import { uploadVouchers } from '@/lib/api/products';
 
 const MAX_CODES = 500;
+const COST_AMOUNT_RE = /^(?!0+(\.0+)?$)\d{1,14}(\.\d{1,2})?$/;
+const COST_CURRENCY_OPTIONS = [
+  { value: 'NGN', label: 'NGN' },
+  { value: 'USD', label: 'USD' },
+  { value: 'GBP', label: 'GBP' },
+] as const;
 
 const parseCodes = (raw: string): string[] =>
   raw
@@ -39,21 +53,36 @@ export function UploadVouchersDialog({
 }: Readonly<UploadVouchersDialogProps>) {
   const [open, setOpen] = useState(false);
   const [raw, setRaw] = useState('');
+  const [unitCostAmount, setUnitCostAmount] = useState('');
+  const [unitCostCurrency, setUnitCostCurrency] = useState<
+    'NGN' | 'USD' | 'GBP'
+  >('NGN');
   const queryClient = useQueryClient();
 
   const codes = parseCodes(raw);
   const overLimit = codes.length > MAX_CODES;
+  const costOk = COST_AMOUNT_RE.test(unitCostAmount.trim());
+
+  const resetForm = () => {
+    setRaw('');
+    setUnitCostAmount('');
+    setUnitCostCurrency('NGN');
+  };
 
   const mutation = useMutation({
     mutationFn: (codesToUpload: string[]) =>
-      uploadVouchers(productId, codesToUpload),
+      uploadVouchers(productId, {
+        codes: codesToUpload,
+        unitCostAmount: unitCostAmount.trim(),
+        unitCostCurrency,
+      }),
     onSuccess: ({ inserted }) => {
       toast.success(
         `Inserted ${inserted} voucher${inserted === 1 ? '' : 's'}`,
       );
       queryClient.invalidateQueries({ queryKey: ['product', productId] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
-      setRaw('');
+      resetForm();
       setOpen(false);
     },
     onError: (err) => {
@@ -65,7 +94,9 @@ export function UploadVouchersDialog({
 
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (codes.length === 0 || overLimit || mutation.isPending) return;
+    if (codes.length === 0 || overLimit || !costOk || mutation.isPending) {
+      return;
+    }
     mutation.mutate(codes);
   };
 
@@ -74,7 +105,7 @@ export function UploadVouchersDialog({
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
-        if (!next) setRaw('');
+        if (!next) resetForm();
       }}
     >
       <DialogTrigger
@@ -90,11 +121,12 @@ export function UploadVouchersDialog({
           <DialogTitle>Upload vouchers</DialogTitle>
           <DialogDescription>
             Paste one code per line for <strong>{productName}</strong>. Codes
-            are encrypted server-side before storage.
+            are encrypted server-side before storage. Enter what you paid per
+            PIN (buy cost) — this does not change the selling price.
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={onSubmit} noValidate>
+        <form onSubmit={onSubmit} noValidate className="space-y-4">
           <Field>
             <FieldLabel htmlFor="voucher-codes">Voucher codes</FieldLabel>
             <Textarea
@@ -115,6 +147,48 @@ export function UploadVouchersDialog({
             </FieldDescription>
           </Field>
 
+          <div className="grid grid-cols-[1fr_7rem] gap-3">
+            <Field>
+              <FieldLabel htmlFor="unit-cost-amount">
+                Unit cost (per PIN)
+              </FieldLabel>
+              <Input
+                id="unit-cost-amount"
+                inputMode="decimal"
+                value={unitCostAmount}
+                onChange={(e) => setUnitCostAmount(e.target.value)}
+                placeholder="13200.00"
+                disabled={mutation.isPending}
+                autoComplete="off"
+              />
+              <FieldDescription>
+                What you paid the supplier for one code.
+              </FieldDescription>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="unit-cost-currency">Currency</FieldLabel>
+              <Select
+                items={[...COST_CURRENCY_OPTIONS]}
+                value={unitCostCurrency}
+                onValueChange={(v) =>
+                  setUnitCostCurrency(v as 'NGN' | 'USD' | 'GBP')
+                }
+                disabled={mutation.isPending}
+              >
+                <SelectTrigger id="unit-cost-currency" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {COST_CURRENCY_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
+
           <DialogFooter className="mt-6">
             <Button
               type="button"
@@ -127,7 +201,10 @@ export function UploadVouchersDialog({
             <Button
               type="submit"
               disabled={
-                codes.length === 0 || overLimit || mutation.isPending
+                codes.length === 0 ||
+                overLimit ||
+                !costOk ||
+                mutation.isPending
               }
             >
               {mutation.isPending
