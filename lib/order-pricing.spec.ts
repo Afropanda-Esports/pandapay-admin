@@ -75,6 +75,8 @@ describe('new GBP order', () => {
       voucherApplied: '£0.00',
       rate: '₦2,100.00 / £1',
       fxMarginRealised: '₦2,100',
+      supplierCogs: '—',
+      grossProfit: '—',
       charged: '₦23,100',
     });
     // No dollar figure anywhere for a GBP order.

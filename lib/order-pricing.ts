@@ -48,6 +48,7 @@ interface SnapshotItem {
 /** The order fields this view reads. Anything else on the order is ignored. */
 export interface OrderPricingInput {
   amount: string;
+  cogsNgn?: string | null;
   baseCurrency?: string | null;
   baseAmountTotal?: string | null;
   ngnPerUnit?: string | null;
@@ -84,6 +85,8 @@ export type OrderPricingView =
         voucherApplied: string;
         rate: string;
         fxMarginRealised: string;
+        supplierCogs: string;
+        grossProfit: string;
         charged: string;
       };
       /**
@@ -139,6 +142,19 @@ export function orderPricingView(order: OrderPricingInput): OrderPricingView {
       fxMarginRealised: order.fxMarkupNgn
         ? formatMoney(order.fxMarkupNgn, 'NGN')
         : MISSING,
+      supplierCogs: order.cogsNgn
+        ? formatMoney(order.cogsNgn, 'NGN')
+        : MISSING,
+      grossProfit:
+        order.cogsNgn != null
+          ? formatMoney(
+              (
+                Number.parseFloat(String(order.amount)) -
+                Number.parseFloat(String(order.cogsNgn))
+              ).toFixed(2),
+              'NGN',
+            )
+          : MISSING,
       charged: formatMoney(order.amount, 'NGN'),
     },
     legacy:
