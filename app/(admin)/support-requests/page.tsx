@@ -130,8 +130,16 @@ function SupportRequestCard({
       <CardContent className="space-y-3 text-sm">
         <p className="whitespace-pre-wrap">{row.issueDescription}</p>
         <p>
-          Order:{' '}
-          {row.orderId ? (
+          Email:{' '}
+          {row.contactEmail ? (
+            <span className="font-mono">{row.contactEmail}</span>
+          ) : (
+            <span className="text-muted-foreground">Not provided</span>
+          )}
+        </p>
+        {row.orderId ? (
+          <p>
+            Order:{' '}
             <Button
               variant="link"
               size="sm"
@@ -140,10 +148,8 @@ function SupportRequestCard({
             >
               {row.orderId.slice(0, 8)}…
             </Button>
-          ) : (
-            <span className="text-muted-foreground">No order linked</span>
-          )}
-        </p>
+          </p>
+        ) : null}
         {row.status === 'RESOLVED' && row.resolvedAt ? (
           <p className="text-muted-foreground">
             Resolved {format(parseISO(row.resolvedAt), 'PPpp')}
