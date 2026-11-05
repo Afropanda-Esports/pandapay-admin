@@ -258,7 +258,7 @@ function OrdersContent() {
     queryKey: [
       'orders',
       state.status,
-      state.userId,
+      state.whatsappNumber,
       state.orderId,
       state.from,
       state.to,
@@ -269,7 +269,7 @@ function OrdersContent() {
         page: state.page,
         limit: PAGE_SIZE,
         status: state.status ?? undefined,
-        userId: state.userId ?? undefined,
+        whatsappNumber: state.whatsappNumber ?? undefined,
         orderId: state.orderId ?? undefined,
         from: state.from ?? undefined,
         to: state.to ?? undefined,

@@ -43,3 +43,5 @@ export const getWhatsappMessagesSummary = (from?: string, to?: string) => {
     `/admin/whatsapp-messages/summary${qs ? `?${qs}` : ''}`,
   );
 };
+
+export { getWhatsappMessageVolume } from './whatsapp-message-volume';

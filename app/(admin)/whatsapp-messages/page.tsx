@@ -8,6 +8,7 @@ import { useMemo, useState } from 'react';
 
 import { PageHeader } from '@/components/shared/page-header';
 import { PaginationControls } from '@/components/shared/pagination-controls';
+import { WhatsappVolumeView } from '@/components/features/whatsapp-messages/volume-view';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,14 +17,18 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { usePermissions } from '@/hooks/use-permissions';
 import {
   getWhatsappMessagesSummary,
+  getWhatsappMessageVolume,
   listWhatsappMessages,
-  listWhatsappMessagesForUser,
 } from '@/lib/api/whatsapp-messages';
-import type { WhatsappMessage, WhatsappMessageDirection } from '@/lib/types';
+import type {
+  AnalyticsDayWindow,
+  WhatsappMessage,
+  WhatsappMessageDirection,
+} from '@/lib/types';
 
 const PAGE_SIZE = 20;
 
-type ViewMode = 'list' | 'user' | 'summary';
+type ViewMode = 'list' | 'user' | 'summary' | 'volume';
 
 export default function WhatsappMessagesPage() {
   const { can } = usePermissions();
@@ -36,16 +41,15 @@ export default function WhatsappMessagesPage() {
   );
   const [reason, setReason] = useState('');
   const [phone, setPhone] = useState('');
-  const [userId, setUserId] = useState('');
+  const [volumeDays, setVolumeDays] = useState<AnalyticsDayWindow>(14);
 
   const listFilters = useMemo(
     () => ({
       whatsappNumber: phone.trim() || undefined,
-      userId: view === 'list' ? userId.trim() || undefined : undefined,
       direction: direction === 'all' ? undefined : direction,
       reason: reason.trim() || undefined,
     }),
-    [phone, userId, direction, reason, view],
+    [phone, direction, reason],
   );
 
   const listQuery = useQuery({
@@ -55,15 +59,25 @@ export default function WhatsappMessagesPage() {
   });
 
   const userQuery = useQuery({
-    queryKey: ['whatsapp-messages-user', userId, page],
-    queryFn: () => listWhatsappMessagesForUser(userId.trim(), page, PAGE_SIZE),
-    enabled: canView && view === 'user' && userId.trim().length > 0,
+    queryKey: ['whatsapp-messages-user', phone, page, direction],
+    queryFn: () =>
+      listWhatsappMessages(page, PAGE_SIZE, {
+        whatsappNumber: phone.trim(),
+        direction: direction === 'all' ? undefined : direction,
+      }),
+    enabled: canView && view === 'user' && phone.trim().length > 0,
   });
 
   const summaryQuery = useQuery({
     queryKey: ['whatsapp-messages-summary'],
     queryFn: () => getWhatsappMessagesSummary(),
     enabled: canView && view === 'summary',
+  });
+
+  const volumeQuery = useQuery({
+    queryKey: ['whatsapp-message-volume', volumeDays],
+    queryFn: () => getWhatsappMessageVolume(volumeDays),
+    enabled: canView && view === 'volume',
   });
 
   if (!canView) {
@@ -75,7 +89,13 @@ export default function WhatsappMessagesPage() {
   }
 
   const active =
-    view === 'list' ? listQuery : view === 'user' ? userQuery : summaryQuery;
+    view === 'list'
+      ? listQuery
+      : view === 'user'
+        ? userQuery
+        : view === 'summary'
+          ? summaryQuery
+          : volumeQuery;
 
   return (
     <div className="space-y-6">
@@ -100,6 +120,7 @@ export default function WhatsappMessagesPage() {
             ['list', 'All messages'],
             ['user', 'By user'],
             ['summary', 'Summary'],
+            ['volume', 'Volume'],
           ] as const
         ).map(([id, label]) => (
           <Button
@@ -116,7 +137,7 @@ export default function WhatsappMessagesPage() {
         ))}
       </div>
 
-      {view !== 'summary' ? (
+      {view === 'list' || view === 'user' ? (
         <div className="flex flex-wrap items-end gap-3">
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">Direction</label>
@@ -136,55 +157,38 @@ export default function WhatsappMessagesPage() {
               ))}
             </div>
           </div>
-          {view === 'list' ? (
-            <>
-              <div className="space-y-1">
-                <label className="text-xs text-muted-foreground" htmlFor="wa-phone">
-                  WhatsApp number
-                </label>
-                <Input
-                  id="wa-phone"
-                  value={phone}
-                  onChange={(e) => {
-                    setPhone(e.target.value);
-                    setPage(1);
-                  }}
-                  placeholder="234…"
-                  className="w-40"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs text-muted-foreground" htmlFor="wa-reason">
-                  Reason
-                </label>
-                <Input
-                  id="wa-reason"
-                  value={reason}
-                  onChange={(e) => {
-                    setReason(e.target.value);
-                    setPage(1);
-                  }}
-                  placeholder="fulfillment_codes"
-                  className="w-48"
-                />
-              </div>
-            </>
-          ) : null}
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground" htmlFor="wa-user">
-              User ID
+            <label className="text-xs text-muted-foreground" htmlFor="wa-phone">
+              WhatsApp number
             </label>
             <Input
-              id="wa-user"
-              value={userId}
+              id="wa-phone"
+              value={phone}
               onChange={(e) => {
-                setUserId(e.target.value);
+                setPhone(e.target.value);
                 setPage(1);
               }}
-              placeholder="uuid"
-              className="w-72"
+              placeholder="234…"
+              className="w-48"
             />
           </div>
+          {view === 'list' ? (
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground" htmlFor="wa-reason">
+                Reason
+              </label>
+              <Input
+                id="wa-reason"
+                value={reason}
+                onChange={(e) => {
+                  setReason(e.target.value);
+                  setPage(1);
+                }}
+                placeholder="fulfillment_codes"
+                className="w-48"
+              />
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -194,10 +198,24 @@ export default function WhatsappMessagesPage() {
           error={summaryQuery.isError}
           data={summaryQuery.data}
         />
-      ) : view === 'user' && !userId.trim() ? (
+      ) : view === 'volume' ? (
+        <WhatsappVolumeView
+          days={volumeDays}
+          onDaysChange={setVolumeDays}
+          data={volumeQuery.data}
+          loading={volumeQuery.isLoading}
+          error={volumeQuery.isError}
+          onRetry={() => void volumeQuery.refetch()}
+          onSelectNumber={(number) => {
+            setPhone(number);
+            setView('user');
+            setPage(1);
+          }}
+        />
+      ) : view === 'user' && !phone.trim() ? (
         <Card>
           <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            Enter a user ID to load their WhatsApp thread.
+            Enter a WhatsApp number to load their messages.
           </CardContent>
         </Card>
       ) : (

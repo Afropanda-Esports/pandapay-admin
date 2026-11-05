@@ -11,7 +11,7 @@ interface GetOrdersParams {
   page?: number;
   limit?: number;
   status?: OrderStatus;
-  userId?: string;
+  whatsappNumber?: string;
   orderId?: string;
   from?: string;
   to?: string;

@@ -97,6 +97,22 @@ export interface Stats {
   };
 }
 
+export type AnalyticsDayWindow = 7 | 14 | 30;
+
+export interface StatsSeriesBucket {
+  date: string;
+  ordersCreated: number;
+  ordersFulfilled: number;
+  revenueNgn: string;
+  newUsers: number;
+}
+
+export interface StatsSeries {
+  days: AnalyticsDayWindow;
+  timezone: 'Africa/Lagos';
+  buckets: StatsSeriesBucket[];
+}
+
 // ─── Payments ─────────────────────────────────────────────────────────────────
 
 export type PaymentMethod =
@@ -330,6 +346,29 @@ export interface WhatsappMessageSummary {
   byReason: Record<string, number>;
   totalInbound: number;
   totalOutbound: number;
+}
+
+export interface WhatsappMessageCounts {
+  inbound: number;
+  outbound: number;
+  total: number;
+}
+
+export interface WhatsappMessageVolume {
+  timezone: 'Africa/Lagos';
+  days: AnalyticsDayWindow;
+  periods: {
+    day: WhatsappMessageCounts;
+    week: WhatsappMessageCounts;
+    month: WhatsappMessageCounts;
+  };
+  buckets: Array<WhatsappMessageCounts & { date: string }>;
+  topUsers: Array<
+    WhatsappMessageCounts & {
+      userId: string | null;
+      whatsappNumber: string;
+    }
+  >;
 }
 
 // ─── Products ─────────────────────────────────────────────────────────────────

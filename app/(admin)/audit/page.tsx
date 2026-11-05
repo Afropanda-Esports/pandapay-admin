@@ -234,13 +234,14 @@ function ActorCell({
           render={
             <span className="cursor-help text-xs">
               <span className="font-medium">
-                {user.displayName ?? user.whatsappNumber}
+                {user.displayName
+                  ? `${user.displayName} · ${user.whatsappNumber}`
+                  : user.whatsappNumber}
               </span>
-              <span className="ml-1 text-muted-foreground">(user)</span>
             </span>
           }
         />
-        <TooltipContent>{actor}</TooltipContent>
+        <TooltipContent>{user.whatsappNumber}</TooltipContent>
       </Tooltip>
     );
   }
@@ -476,17 +477,17 @@ function AuditFilters({ directory, users }: Readonly<AuditFiltersProps>) {
     actorSelectItems[admin.id] = admin.displayName;
   }
   for (const user of users) {
-    actorSelectItems[user.id] = user.displayName
-      ? `${user.displayName} (user)`
-      : `${user.whatsappNumber} (user)`;
+    actorSelectItems[user.whatsappNumber] = user.displayName
+      ? `${user.displayName} · ${user.whatsappNumber}`
+      : user.whatsappNumber;
   }
-  // If the URL has an actor value that isn't in the directory (e.g. a user
-  // UUID from a PIN_SET event, or a deactivated admin), keep it selectable
-  // by including it as a raw-UUID entry.
+  // A value that is not an admin id or a loaded phone (old user id bookmark,
+  // deactivated admin) stays selectable.
   if (
     filters.actor &&
     filters.actor !== SYSTEM_ACTOR &&
-    !directory.some((a) => a.id === filters.actor)
+    !directory.some((a) => a.id === filters.actor) &&
+    !users.some((u) => u.whatsappNumber === filters.actor)
   ) {
     actorSelectItems[filters.actor] = `${filters.actor.slice(0, 8)}…`;
   }
