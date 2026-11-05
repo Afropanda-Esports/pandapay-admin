@@ -314,6 +314,7 @@ export type SupportRequestStatus = 'OPEN' | 'RESOLVED';
 export interface SupportRequest {
   id: string;
   userId: string;
+  publicRef: string | null;
   whatsappNumber: string;
   orderId: string | null;
   contactEmail: string | null;
