@@ -57,7 +57,7 @@ const STATUS_SELECT_ITEMS: Record<string, string> = {
 
 export const orderListParsers = {
   status: parseAsStringLiteral(STATUS_VALUES),
-  userId: parseAsString,
+  whatsappNumber: parseAsString,
   orderId: parseAsString,
   from: parseAsString,
   to: parseAsString,
@@ -80,14 +80,14 @@ export function OrderFilters() {
   const [filters, setFilters] = useQueryStates(orderListParsers, {
     shallow: false,
   });
-  const [userIdDraft, setUserIdDraft] = useState(filters.userId ?? '');
+  const [phoneDraft, setPhoneDraft] = useState(filters.whatsappNumber ?? '');
   const [orderIdDraft, setOrderIdDraft] = useState(filters.orderId ?? '');
 
   const fromDate = safeParse(filters.from);
   const toDate = safeParse(filters.to);
   const hasFilter =
     Boolean(filters.status) ||
-    Boolean(filters.userId) ||
+    Boolean(filters.whatsappNumber) ||
     Boolean(filters.orderId) ||
     Boolean(filters.from) ||
     Boolean(filters.to);
@@ -107,10 +107,10 @@ export function OrderFilters() {
     });
   };
 
-  const commitUserId = () => {
-    const trimmed = userIdDraft.trim();
-    if ((filters.userId ?? '') === trimmed) return;
-    setFilters({ userId: trimmed || null, page: 1 });
+  const commitPhone = () => {
+    const trimmed = phoneDraft.trim();
+    if ((filters.whatsappNumber ?? '') === trimmed) return;
+    setFilters({ whatsappNumber: trimmed || null, page: 1 });
   };
 
   const commitOrderId = () => {
@@ -120,11 +120,11 @@ export function OrderFilters() {
   };
 
   const handleReset = () => {
-    setUserIdDraft('');
+    setPhoneDraft('');
     setOrderIdDraft('');
     setFilters({
       status: null,
-      userId: null,
+      whatsappNumber: null,
       orderId: null,
       from: null,
       to: null,
@@ -177,16 +177,17 @@ export function OrderFilters() {
       </Popover>
 
       <Input
-        value={userIdDraft}
-        onChange={(e) => setUserIdDraft(e.target.value)}
-        onBlur={commitUserId}
+        value={phoneDraft}
+        onChange={(e) => setPhoneDraft(e.target.value)}
+        onBlur={commitPhone}
         onKeyDown={(e) => {
           if (e.key === 'Enter') {
             e.preventDefault();
-            commitUserId();
+            commitPhone();
           }
         }}
-        placeholder="User ID"
+        placeholder="WhatsApp number"
+        inputMode="tel"
         className="w-50 font-mono text-xs"
       />
 

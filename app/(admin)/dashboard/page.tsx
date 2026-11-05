@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 
 import { OrdersChart } from '@/components/features/dashboard/orders-chart';
 import { RevenueChart } from '@/components/features/dashboard/revenue-chart';
+import { DailySeriesCharts } from '@/components/features/dashboard/daily-series-charts';
 import { PageHeader } from '@/components/shared/page-header';
 import { StatCard } from '@/components/shared/stat-card';
 import { RequirePermission } from '@/components/shared/require-permission';
@@ -390,6 +391,8 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      <DailySeriesCharts />
 
       <div className="mt-6">
         <OperationsCard />
