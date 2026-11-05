@@ -120,8 +120,14 @@ function SupportRequestCard({
     <Card>
       <CardHeader className="flex flex-row items-start justify-between gap-4">
         <div>
-          <CardTitle className="text-base font-mono">{row.whatsappNumber}</CardTitle>
+          <CardTitle className="text-base font-mono">
+            {row.publicRef ?? row.whatsappNumber}
+          </CardTitle>
           <p className="text-sm text-muted-foreground">
+            {row.publicRef ? (
+              <span className="font-mono">{row.whatsappNumber}</span>
+            ) : null}
+            {row.publicRef ? ' · ' : null}
             {format(parseISO(row.createdAt), 'PPpp')}
           </p>
         </div>
