@@ -324,10 +324,43 @@ export default function DashboardPage() {
           }
           isLoading={isLoading}
         />
+        <StatCard
+          icon={Wallet}
+          label="Supplier COGS"
+          value={
+            data?.revenue.cogsNgn != null
+              ? formatFxMarkupNgn(data.revenue.cogsNgn)
+              : '—'
+          }
+          subtitle={
+            data?.revenue.last7DaysCogsNgn != null
+              ? `${formatFxMarkupNgn(data.revenue.last7DaysCogsNgn)} this week`
+              : undefined
+          }
+          isLoading={isLoading}
+        />
+        <StatCard
+          icon={Wallet}
+          label="Gross profit"
+          value={
+            data?.revenue.grossProfitNgn != null
+              ? formatFxMarkupNgn(data.revenue.grossProfitNgn)
+              : '—'
+          }
+          subtitle={
+            data?.revenue.last7DaysGrossProfitNgn != null
+              ? `${formatFxMarkupNgn(data.revenue.last7DaysGrossProfitNgn)} this week`
+              : undefined
+          }
+          isLoading={isLoading}
+        />
       </div>
       <p className="mt-2 text-xs text-muted-foreground">
-        FX markup is the spread on fulfilled orders with a face value — not
-        wholesale profit or Paystack fees.
+        FX markup is the face×oracle spread — not wholesale. COGS / gross profit
+        use stored PIN buy cost (₦) on fulfilled orders.
+        {data?.revenue.ordersMissingCogs
+          ? ` ${data.revenue.ordersMissingCogs} fulfilled order(s) missing COGS.`
+          : ''}
       </p>
 
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">

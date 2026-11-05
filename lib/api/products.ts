@@ -162,13 +162,22 @@ export const updateProductPricing = (
 
 export type UploadVouchersBody = {
   codes: string[];
+  /** Supplier cost for one PIN; batch total = this × code count. */
   unitCostAmount: string;
-  /** Defaults to NGN on the server when omitted. */
+  /** Defaults to NGN when omitted. */
   unitCostCurrency?: 'NGN' | 'USD' | 'GBP';
+  /** NGN per 1 unit of purchase currency; required when currency ≠ NGN. */
+  unitCostFxRate?: string;
 };
 
 export const uploadVouchers = (id: string, body: UploadVouchersBody) =>
-  apiFetch<{ inserted: number }>(`/admin/products/${id}/vouchers`, {
+  apiFetch<{
+    inserted: number;
+    stockBatchId: string;
+    unitCostNgn: string;
+    unitCostFxRate: string | null;
+    unitCostCurrency: 'NGN' | 'USD' | 'GBP';
+  }>(`/admin/products/${id}/vouchers`, {
     method: 'POST',
     body: JSON.stringify(body),
   });
@@ -177,3 +186,42 @@ export const getVoucherStats = (id: string) =>
   apiFetch<{ productId: string } & VoucherStats>(
     `/admin/products/${id}/vouchers/stats`,
   );
+
+export type VoucherStockBatchSummary = {
+  id: string;
+  stockedAt: string;
+  qty: number;
+  purchaseTotal: string;
+  currency: 'NGN' | 'USD' | 'GBP';
+  fxRate: string | null;
+  unitCostNgn: string;
+  unusedCount: number;
+  usedCount: number;
+};
+
+export const listVoucherBatches = (
+  productId: string,
+  params?: { limit?: number; offset?: number },
+) => {
+  const q = new URLSearchParams();
+  if (params?.limit != null) q.set('limit', String(params.limit));
+  if (params?.offset != null) q.set('offset', String(params.offset));
+  const qs = q.toString();
+  return apiFetch<{ items: VoucherStockBatchSummary[]; total: number }>(
+    `/admin/products/${productId}/voucher-batches${qs ? `?${qs}` : ''}`,
+  );
+};
+
+export const getVoucherBatch = (productId: string, batchId: string) =>
+  apiFetch<{
+    batch: Omit<
+      VoucherStockBatchSummary,
+      'unusedCount' | 'usedCount'
+    > & { productId: string };
+    pins: Array<{
+      id: string;
+      isUsed: boolean;
+      unitCostNgn: string | null;
+      stockedAt: string | null;
+    }>;
+  }>(`/admin/products/${productId}/voucher-batches/${batchId}`);

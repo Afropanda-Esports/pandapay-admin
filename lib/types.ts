@@ -84,6 +84,11 @@ export interface Stats {
     /** SUM(fx_markup_ngn) of FULFILLED orders — 2 dp string. Absent on pre-ORD-003 APIs. */
     fxMarkupNgn?: string;
     last7DaysFxMarkupNgn?: string;
+    cogsNgn?: string;
+    last7DaysCogsNgn?: string;
+    grossProfitNgn?: string;
+    last7DaysGrossProfitNgn?: string;
+    ordersMissingCogs?: number;
   };
   vouchers: {
     total: number;
@@ -203,6 +208,8 @@ export interface Order {
   markupBps?: number | null;
   oracleNgnPerUsd?: string | null;
   fxMarkupNgn?: string | null;
+  /** Supplier COGS in NGN (Σ used PIN costs); null if unknown. */
+  cogsNgn?: string | null;
 }
 
 export interface PaymentTimelineEntry {
@@ -364,6 +371,11 @@ export interface VoucherStats {
   /** Last stock-in buy cost per PIN; null for legacy stock. */
   lastUnitCostAmount?: string | null;
   lastUnitCostCurrency?: 'NGN' | 'USD' | 'GBP' | null;
+  lastUnitCostNgn?: string | null;
+  lastUnitCostFxRate?: string | null;
+  lastStockedAt?: string | null;
+  liveInventoryCostNgn?: string | null;
+  sellingPriceNgn?: string | null;
 }
 
 export interface Product {

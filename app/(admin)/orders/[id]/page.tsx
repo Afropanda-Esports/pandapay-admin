@@ -296,6 +296,8 @@ function PricingInfo({ order }: Readonly<{ order: OrderDetail }>) {
           </div>
           <div>
             <DetailRow label="FX margin realised" value={view.summary.fxMarginRealised} />
+            <DetailRow label="Supplier COGS" value={view.summary.supplierCogs} />
+            <DetailRow label="Gross profit" value={view.summary.grossProfit} />
             <DetailRow label="Charged" value={view.summary.charged} />
           </div>
         </div>

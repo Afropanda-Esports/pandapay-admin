@@ -10,7 +10,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import Link from 'next/link';
-import { use } from 'react';
+import { use, useState } from 'react';
 import { toast } from 'sonner';
 
 import { PricingCard } from '@/components/features/products/pricing-card';
@@ -27,10 +27,21 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ApiError } from '@/lib/api/client';
-import { getProduct, updateProduct } from '@/lib/api/products';
-import { formatProductPrice } from '@/lib/money';
+import {
+  getProduct,
+  getVoucherBatch,
+  listVoucherBatches,
+  updateProduct,
+} from '@/lib/api/products';
+import { formatMoney, formatProductPrice } from '@/lib/money';
 import { readinessChecklist } from '@/lib/product-create';
 import type { ProductWithStats } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -156,15 +167,18 @@ function VoucherStatsCard({
     available,
     total,
     used,
-    lastUnitCostAmount,
-    lastUnitCostCurrency,
+    lastUnitCostNgn,
+    lastUnitCostFxRate,
+    lastStockedAt,
+    liveInventoryCostNgn,
+    sellingPriceNgn,
   } = product.voucherStats;
   const ratio = total === 0 ? 0 : available / total;
   const pct = Math.round(ratio * 100);
-  const lastCostLabel =
-    lastUnitCostAmount != null && lastUnitCostCurrency != null
-      ? `${lastUnitCostCurrency} ${Number(lastUnitCostAmount).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-      : null;
+  const sell =
+    sellingPriceNgn != null
+      ? formatMoney(sellingPriceNgn, 'NGN')
+      : formatProductPrice(product);
 
   return (
     <Card>
@@ -198,13 +212,39 @@ function VoucherStatsCard({
             </p>
           </div>
         </div>
-        {lastCostLabel && (
-          <p className="text-sm text-muted-foreground">
-            Last unit cost:{' '}
-            <span className="font-medium text-foreground">{lastCostLabel}</span>
-            <span className="block text-xs">Buy cost at last stock-in (not sell price).</span>
+        <div className="space-y-1 text-sm text-muted-foreground">
+          <p>
+            Selling price:{' '}
+            <span className="font-medium text-foreground">{sell}</span>
           </p>
-        )}
+          {lastUnitCostNgn != null ? (
+            <p>
+              Last cost / unit:{' '}
+              <span className="font-medium text-foreground">
+                {formatMoney(lastUnitCostNgn, 'NGN')}
+              </span>
+              {lastUnitCostFxRate != null
+                ? ` · rate ${Number(lastUnitCostFxRate).toLocaleString('en-NG')}`
+                : null}
+              {lastStockedAt != null ? (
+                <span className="block text-xs">
+                  Stocked {new Date(lastStockedAt).toLocaleString('en-NG')}
+                </span>
+              ) : null}
+            </p>
+          ) : null}
+          {liveInventoryCostNgn != null ? (
+            <p>
+              Live inventory cost:{' '}
+              <span className="font-medium text-foreground">
+                {formatMoney(liveInventoryCostNgn, 'NGN')}
+              </span>
+              <span className="block text-xs">
+                Sum of ₦ buy cost on unused PINs.
+              </span>
+            </p>
+          ) : null}
+        </div>
         <div className="space-y-1">
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span>Stock level</span>
@@ -221,6 +261,144 @@ function VoucherStatsCard({
           </div>
         </div>
       </CardContent>
+    </Card>
+  );
+}
+
+function StockHistoryCard({ productId }: Readonly<{ productId: string }>) {
+  const [batchId, setBatchId] = useState<string | null>(null);
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['product-voucher-batches', productId],
+    queryFn: () => listVoucherBatches(productId, { limit: 50 }),
+  });
+  const detail = useQuery({
+    queryKey: ['product-voucher-batch', productId, batchId],
+    queryFn: () => getVoucherBatch(productId, batchId!),
+    enabled: batchId != null,
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Stock history</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <Skeleton className="h-24 w-full" />
+        ) : isError ? (
+          <p className="text-sm text-muted-foreground">
+            Could not load stock batches.
+          </p>
+        ) : !data?.items.length ? (
+          <p className="text-sm text-muted-foreground">
+            No stock-in batches yet.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="text-xs uppercase tracking-wide text-muted-foreground">
+                <tr>
+                  <th className="py-2 pr-3 font-medium">Date</th>
+                  <th className="py-2 pr-3 font-medium">Qty</th>
+                  <th className="py-2 pr-3 font-medium">Purchase</th>
+                  <th className="py-2 pr-3 font-medium">Rate</th>
+                  <th className="py-2 pr-3 font-medium">₦/unit</th>
+                  <th className="py-2 font-medium">Left</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.items.map((b) => (
+                  <tr
+                    key={b.id}
+                    className="border-t border-border/60 cursor-pointer hover:bg-muted/40"
+                    onClick={() => setBatchId(b.id)}
+                  >
+                    <td className="py-2 pr-3 tabular-nums">
+                      {new Date(b.stockedAt).toLocaleString('en-NG')}
+                    </td>
+                    <td className="py-2 pr-3 tabular-nums">{b.qty}</td>
+                    <td className="py-2 pr-3 tabular-nums">
+                      {b.currency}{' '}
+                      {Number(b.purchaseTotal).toLocaleString('en-NG', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </td>
+                    <td className="py-2 pr-3 tabular-nums">
+                      {b.fxRate != null
+                        ? Number(b.fxRate).toLocaleString('en-NG')
+                        : '—'}
+                    </td>
+                    <td className="py-2 pr-3 tabular-nums">
+                      {formatMoney(b.unitCostNgn, 'NGN')}
+                    </td>
+                    <td className="py-2 tabular-nums">
+                      {b.unusedCount}/{b.qty}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Click a row for PIN-level cost (codes never shown).
+            </p>
+          </div>
+        )}
+      </CardContent>
+
+      <Dialog
+        open={batchId != null}
+        onOpenChange={(open) => {
+          if (!open) setBatchId(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Batch PINs</DialogTitle>
+          </DialogHeader>
+          {detail.isLoading ? (
+            <Skeleton className="h-32 w-full" />
+          ) : detail.data ? (
+            <div className="space-y-3 text-sm">
+              <p className="text-muted-foreground">
+                {formatMoney(detail.data.batch.unitCostNgn, 'NGN')}/unit ·{' '}
+                {detail.data.batch.qty} codes ·{' '}
+                {new Date(detail.data.batch.stockedAt).toLocaleString('en-NG')}
+              </p>
+              <div className="max-h-64 overflow-y-auto">
+                <table className="w-full text-left">
+                  <thead className="text-xs uppercase text-muted-foreground">
+                    <tr>
+                      <th className="py-1 pr-2 font-medium">PIN id</th>
+                      <th className="py-1 pr-2 font-medium">Cost ₦</th>
+                      <th className="py-1 font-medium">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {detail.data.pins.map((pin) => (
+                      <tr key={pin.id} className="border-t border-border/60">
+                        <td className="py-1 pr-2 font-mono text-xs">
+                          {pin.id.slice(0, 8)}…
+                        </td>
+                        <td className="py-1 pr-2 tabular-nums">
+                          {pin.unitCostNgn != null
+                            ? formatMoney(pin.unitCostNgn, 'NGN')
+                            : '—'}
+                        </td>
+                        <td className="py-1">
+                          {pin.isUsed ? 'Used' : 'Unused'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">Batch not found.</p>
+          )}
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
@@ -400,6 +578,9 @@ export default function ProductDetailPage({
         />
         <VoucherStatsCard product={product} />
         <ReadinessCard product={product} />
+        <div className="lg:col-span-2">
+          <StockHistoryCard productId={product.id} />
+        </div>
       </div>
     </div>
   );
