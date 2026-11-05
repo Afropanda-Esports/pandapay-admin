@@ -361,6 +361,9 @@ export interface VoucherStats {
   total: number;
   available: number;
   used: number;
+  /** Last stock-in buy cost per PIN; null for legacy stock. */
+  lastUnitCostAmount?: string | null;
+  lastUnitCostCurrency?: 'NGN' | 'USD' | 'GBP' | null;
 }
 
 export interface Product {

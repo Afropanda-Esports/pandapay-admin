@@ -152,9 +152,19 @@ function DetailsCard({
 function VoucherStatsCard({
   product,
 }: Readonly<{ product: ProductWithStats }>) {
-  const { available, total, used } = product.voucherStats;
+  const {
+    available,
+    total,
+    used,
+    lastUnitCostAmount,
+    lastUnitCostCurrency,
+  } = product.voucherStats;
   const ratio = total === 0 ? 0 : available / total;
   const pct = Math.round(ratio * 100);
+  const lastCostLabel =
+    lastUnitCostAmount != null && lastUnitCostCurrency != null
+      ? `${lastUnitCostCurrency} ${Number(lastUnitCostAmount).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      : null;
 
   return (
     <Card>
@@ -188,6 +198,13 @@ function VoucherStatsCard({
             </p>
           </div>
         </div>
+        {lastCostLabel && (
+          <p className="text-sm text-muted-foreground">
+            Last unit cost:{' '}
+            <span className="font-medium text-foreground">{lastCostLabel}</span>
+            <span className="block text-xs">Buy cost at last stock-in (not sell price).</span>
+          </p>
+        )}
         <div className="space-y-1">
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span>Stock level</span>
