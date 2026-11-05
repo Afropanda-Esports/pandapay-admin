@@ -316,6 +316,7 @@ export interface SupportRequest {
   userId: string;
   whatsappNumber: string;
   orderId: string | null;
+  contactEmail: string | null;
   issueDescription: string;
   status: SupportRequestStatus;
   resolvedAt: string | null;
