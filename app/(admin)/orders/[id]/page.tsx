@@ -18,6 +18,7 @@ import { PaymentTimeline } from '@/components/orders/payment-timeline';
 import { RecordRefundDialog } from '@/components/features/orders/record-refund-dialog';
 import { ResolvePaymentExceptionDialog } from '@/components/features/orders/resolve-payment-exception-dialog';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
+import { DetailRow, InfoCard } from '@/components/shared/detail-card';
 import { PageHeader } from '@/components/shared/page-header';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -51,34 +52,6 @@ const formatAmount = (raw: string) => {
 };
 
 const formatDateTime = (iso: string) => format(parseISO(iso), 'PPpp');
-
-function DetailRow({
-  label,
-  value,
-}: Readonly<{ label: string; value: React.ReactNode }>) {
-  return (
-    <div className="flex items-baseline justify-between gap-4 border-b border-border/60 py-2 last:border-b-0">
-      <span className="text-xs uppercase tracking-wide text-muted-foreground">
-        {label}
-      </span>
-      <span className="text-right text-sm font-medium break-all">{value}</span>
-    </div>
-  );
-}
-
-function InfoCard({
-  title,
-  children,
-}: Readonly<{ title: string; children: React.ReactNode }>) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-sm">{title}</CardTitle>
-      </CardHeader>
-      <CardContent>{children}</CardContent>
-    </Card>
-  );
-}
 
 function FulfillmentInconsistencyAlert() {
   return (

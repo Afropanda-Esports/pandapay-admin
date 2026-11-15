@@ -655,3 +655,86 @@ export interface GenerateVoucherCodesInput {
   expiresInDays?: number; // 1–90
   recipientLabel?: string;
 }
+
+// ─── NEAR Intents (read-only) ────────────────────────────────────────────────
+// Amounts on chain and in checkout webhooks are USDC base-unit strings (6 dp).
+// cryptoAmountUsdc / cryptoReceivedUsdc are already decimal strings.
+
+export type IntentsOnchainStatus = 'ok' | 'not_registered' | 'unavailable';
+
+export interface IntentsTxHash {
+  hash: string;
+  explorerUrl: string | null;
+}
+
+export interface IntentsOverview {
+  contract: {
+    network: 'mainnet';
+    policyContractId: string;
+    policyExplorerUrl: string;
+    treasuryAccountId: string;
+    treasuryExplorerUrl: string;
+  };
+  onchain: {
+    status: 'ok' | 'unavailable';
+    limits: { perTx: string; daily: string } | null;
+    daySpend: string | null;
+  };
+  networks: { id: string; title: string; assetId: string }[];
+  totals: {
+    orders: number;
+    byStatus: Partial<Record<OrderStatus, number>>;
+    receivedUsdc: string;
+  };
+}
+
+export interface IntentsPaymentSummary {
+  paymentId: string | null;
+  checkoutStatus: string | null;
+  lastEventType: string;
+  lastEventAt: string | null;
+  originTxHashes: IntentsTxHash[];
+  destinationTxHashes: IntentsTxHash[];
+}
+
+export interface IntentsOrder {
+  id: string;
+  publicOrderRef: string | null;
+  status: OrderStatus;
+  productName: string | null;
+  whatsappNumber: string | null;
+  cryptoChain: string | null;
+  network: string | null;
+  cryptoAmountUsdc: string | null;
+  cryptoReceivedUsdc: string | null;
+  cryptoDepositAddress: string | null;
+  cryptoTxHash: string | null;
+  createdAt: string;
+  intents: IntentsPaymentSummary | null;
+}
+
+export interface IntentsEvent {
+  type: string;
+  occurredAt: string | null;
+  paymentId: string | null;
+  status: string | null;
+  depositedAmount: string | null;
+  settledAmount: string | null;
+  refundedAmount: string | null;
+  originTxHashes: IntentsTxHash[];
+  destinationTxHashes: IntentsTxHash[];
+}
+
+export interface IntentsOnchainRecord {
+  amountReceived: string;
+  refunded: string;
+  reserved: string;
+  refundDestination: string;
+  originAsset: string;
+  fulfilled: boolean;
+}
+
+export interface IntentsOrderDetail extends IntentsOrder {
+  events: IntentsEvent[];
+  onchain: { status: IntentsOnchainStatus; record: IntentsOnchainRecord | null };
+}
