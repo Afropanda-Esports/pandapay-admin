@@ -28,7 +28,7 @@ import {
 } from '@/components/ui/select';
 import type { OrderStatus } from '@/lib/types';
 
-const STATUS_VALUES = [
+export const STATUS_VALUES = [
   'PENDING',
   'PAID',
   'FULFILLED',
@@ -36,7 +36,7 @@ const STATUS_VALUES = [
   'FAILED',
 ] as const satisfies readonly OrderStatus[];
 
-const STATUS_LABEL: Record<OrderStatus, string> = {
+export const STATUS_LABEL: Record<OrderStatus, string> = {
   PENDING: 'Pending',
   PAID: 'Paid',
   FULFILLED: 'Fulfilled',
@@ -76,6 +76,52 @@ const formatRangeLabel = (from?: Date, to?: Date) => {
   return 'Any date';
 };
 
+/** Date range button bound to `from` / `to` query strings in `yyyy-MM-dd`. */
+export function DateRangeFilter({
+  from,
+  to,
+  onChange,
+}: Readonly<{
+  from: string | null;
+  to: string | null;
+  onChange: (range: { from: string | null; to: string | null }) => void;
+}>) {
+  const fromDate = safeParse(from);
+  const toDate = safeParse(to);
+  const handleSelect = (range: DateRange | undefined) => {
+    onChange({
+      from: range?.from ? format(range.from, 'yyyy-MM-dd') : null,
+      to: range?.to ? format(range.to, 'yyyy-MM-dd') : null,
+    });
+  };
+
+  return (
+    <Popover>
+      <PopoverTrigger
+        render={
+          <Button
+            variant="outline"
+            className="justify-start font-normal text-muted-foreground data-[has-value=true]:text-foreground"
+            data-has-value={Boolean(fromDate || toDate)}
+          >
+            <CalendarIcon className="size-4" />
+            {formatRangeLabel(fromDate, toDate)}
+          </Button>
+        }
+      />
+      <PopoverContent className="w-auto p-0" align="start">
+        <Calendar
+          mode="range"
+          selected={{ from: fromDate, to: toDate }}
+          onSelect={handleSelect}
+          numberOfMonths={2}
+          defaultMonth={fromDate}
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export function OrderFilters() {
   const [filters, setFilters] = useQueryStates(orderListParsers, {
     shallow: false,
@@ -83,8 +129,6 @@ export function OrderFilters() {
   const [phoneDraft, setPhoneDraft] = useState(filters.whatsappNumber ?? '');
   const [orderIdDraft, setOrderIdDraft] = useState(filters.orderId ?? '');
 
-  const fromDate = safeParse(filters.from);
-  const toDate = safeParse(filters.to);
   const hasFilter =
     Boolean(filters.status) ||
     Boolean(filters.whatsappNumber) ||
@@ -95,14 +139,6 @@ export function OrderFilters() {
   const handleStatusChange = (value: string | null) => {
     setFilters({
       status: !value || value === ALL ? null : (value as OrderStatus),
-      page: 1,
-    });
-  };
-
-  const handleRangeSelect = (range: DateRange | undefined) => {
-    setFilters({
-      from: range?.from ? format(range.from, 'yyyy-MM-dd') : null,
-      to: range?.to ? format(range.to, 'yyyy-MM-dd') : null,
       page: 1,
     });
   };
@@ -152,29 +188,11 @@ export function OrderFilters() {
         </SelectContent>
       </Select>
 
-      <Popover>
-        <PopoverTrigger
-          render={
-            <Button
-              variant="outline"
-              className="justify-start font-normal text-muted-foreground data-[has-value=true]:text-foreground"
-              data-has-value={Boolean(fromDate || toDate)}
-            >
-              <CalendarIcon className="size-4" />
-              {formatRangeLabel(fromDate, toDate)}
-            </Button>
-          }
-        />
-        <PopoverContent className="w-auto p-0" align="start">
-          <Calendar
-            mode="range"
-            selected={{ from: fromDate, to: toDate }}
-            onSelect={handleRangeSelect}
-            numberOfMonths={2}
-            defaultMonth={fromDate}
-          />
-        </PopoverContent>
-      </Popover>
+      <DateRangeFilter
+        from={filters.from}
+        to={filters.to}
+        onChange={(range) => setFilters({ ...range, page: 1 })}
+      />
 
       <Input
         value={phoneDraft}

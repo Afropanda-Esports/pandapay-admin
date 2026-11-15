@@ -17,6 +17,7 @@ import {
   Landmark,
   LifeBuoy,
   MessageSquare,
+  Link2,
   type LucideIcon,
 } from 'lucide-react';
 import type { AdminPermission } from '@/lib/permissions';
@@ -31,6 +32,7 @@ export interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, permission: 'dashboard:view' },
   { label: 'Orders', href: '/orders', icon: ShoppingBag, permission: 'orders:view' },
+  { label: 'NEAR Intents', href: '/intents', icon: Link2, permission: 'orders:view' },
   { label: 'Transactions', href: '/transactions', icon: Receipt, permission: 'orders:view' },
   { label: 'Users', href: '/users', icon: Users, permission: 'users:view' },
   { label: 'Products', href: '/products', icon: Package, permission: 'products:view' },
