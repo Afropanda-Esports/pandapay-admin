@@ -5,6 +5,7 @@ import { format, formatDistanceToNow, parseISO } from 'date-fns';
 import { AlertCircle, RefreshCw, RotateCw } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { BulkDiscountCard } from '@/components/features/pricing/bulk-discount-card';
 import { CurrencyRateCard } from '@/components/features/pricing/currency-rate-card';
 import { SetRateForm } from '@/components/features/pricing/set-rate-form';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
@@ -425,6 +426,13 @@ export default function PricingPage() {
           ) : null}
         </div>
       )}
+
+      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <BulkDiscountCard
+          canManagePricing={canManagePricing}
+          actorName={(id) => actorName(id, lookup)}
+        />
+      </div>
 
       <div className="mt-6">
         <h2 className="mb-3 text-sm font-medium">GBP/NGN history (oracle)</h2>

@@ -33,7 +33,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ApiError } from '@/lib/api/client';
 import { usePermissions } from '@/hooks/use-permissions';
 import { getOrder, resendOrder, fulfillOrder, refundOrder, retryOrder } from '@/lib/api/orders';
-import { formatProductPrice } from '@/lib/money';
+import { formatBpsAsPercent } from '@/lib/markup';
+import { formatMoney, formatProductPrice } from '@/lib/money';
 import { orderPricingView } from '@/lib/order-pricing';
 import { AppliedDiscountCode } from '@/components/features/orders/order-voucher-codes';
 import { formatOrderSource } from '@/lib/order-source';
@@ -187,6 +188,20 @@ function PaymentInfo({ order }: Readonly<{ order: OrderDetail }>) {
         label="Discount code"
         value={<AppliedDiscountCode code={order.appliedDiscountCode} />}
       />
+      {order.bulkDiscountBps != null && (
+        <DetailRow
+          label="Bulk discount"
+          value={
+            <span className="tabular-nums">
+              {formatBpsAsPercent(order.bulkDiscountBps)} (−
+              {formatMoney(order.bulkDiscountNgn ?? '0', 'NGN')})
+              {order.bulkDiscountUsdc
+                ? `, −${order.bulkDiscountUsdc} USDC`
+                : ''}
+            </span>
+          }
+        />
+      )}
     </InfoCard>
   );
 }

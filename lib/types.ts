@@ -48,6 +48,7 @@ export type AuditAction =
   | 'PRODUCT_AVAILABILITY_CHANGED'
   | 'VOUCHERS_UPLOADED'
   | 'FX_RATE_UPDATED'
+  | 'BULK_DISCOUNT_UPDATED'
   | 'PRODUCTS_RECOMPUTED'
   | 'FRAUD_REVIEWED'
   | 'CRYPTO_PAYMENT_RECEIVED'
@@ -278,6 +279,12 @@ export interface OrderDetail extends Order, OrderPricingSnapshot {
   voucherIsUsed: boolean;
   /** PandaPay promotional code used at checkout. Null when none. */
   appliedDiscountCode?: string | null;
+  /** Bulk discount rate applied, in bps. Null when the order did not get one. */
+  bulkDiscountBps?: number | null;
+  /** Naira taken off by the bulk discount; `amount` is already net of it. */
+  bulkDiscountNgn?: string | null;
+  /** USDC taken off the amount asked for (USDC orders only). */
+  bulkDiscountUsdc?: string | null;
   rateSnapshot?: string | null;
   paystackDvaReference?: string | null;
   /** API field from GET /admin/orders/:id */
@@ -737,4 +744,13 @@ export interface IntentsOnchainRecord {
 export interface IntentsOrderDetail extends IntentsOrder {
   events: IntentsEvent[];
   onchain: { status: IntentsOnchainStatus; record: IntentsOnchainRecord | null };
+}
+
+/** The automatic discount on WhatsApp orders at or over a naira threshold. */
+export interface BulkDiscountSettings {
+  enabled: boolean;
+  bps: number;
+  thresholdNgn: string;
+  updatedBy: string | null;
+  updatedAt: string | null;
 }
