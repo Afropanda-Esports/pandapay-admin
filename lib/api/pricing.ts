@@ -1,5 +1,7 @@
 import { apiFetch } from './client';
+import type { BulkDiscountBody } from '@/lib/bulk-discount-form';
 import type {
+  BulkDiscountSettings,
   CurrencyRateView,
   CurrencyRatesOverview,
   ExchangeRate,
@@ -70,4 +72,15 @@ export const previewPrice = (body: PricePreviewRequest, signal?: AbortSignal) =>
     method: 'POST',
     body: JSON.stringify(body),
     signal,
+  });
+
+/** The bulk discount setting (any admin). */
+export const getBulkDiscount = () =>
+  apiFetch<BulkDiscountSettings>('/admin/pricing/bulk-discount');
+
+/** Change the bulk discount (Super Admin; the backend refuses everyone else). */
+export const updateBulkDiscount = (body: BulkDiscountBody) =>
+  apiFetch<BulkDiscountSettings>('/admin/pricing/bulk-discount', {
+    method: 'PUT',
+    body: JSON.stringify(body),
   });
